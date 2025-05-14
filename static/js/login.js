@@ -19,16 +19,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // Handle student login
-    studentForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const studentId = document.getElementById('studentId').value;
-        const password = document.getElementById('studentPassword').value;
-
-        // Add your student authentication logic here
-        // For demo purposes, redirect to appointment page
-        window.location.href = '/studentdash';
-    });
 
     // Handle admin login
     adminForm.addEventListener('submit', (e) => {

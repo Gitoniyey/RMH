@@ -1,6 +1,9 @@
+const listEl   = document.getElementById('appointmentsList');
+const studentId = Number(listEl.dataset.studentId);
+
 document.addEventListener('DOMContentLoaded', function () {
     const currentUser = JSON.parse(localStorage.getItem('currentUser')) || {
-        id: '24-262549',
+        id: '24262549',
         name: 'Antonette Jean Ignacio',
         type: 'student'
     };
@@ -216,37 +219,57 @@ document.addEventListener('DOMContentLoaded', function () {
         localStorage.setItem('studentNotifications', JSON.stringify(studentNotifications));
     }
 
-    function loadAppointments(filter = 'all') {
-        const list = document.getElementById('appointmentsList');
-        const appointments = JSON.parse(localStorage.getItem('appointments')) || [];
-        const filtered = appointments.filter(a => a.studentId === currentUser.id && (filter === 'all' || a.status === filter));
-        const sorted = [...filtered].sort((a, b) => new Date(b.date) - new Date(a.date));
 
-        if (sorted.length === 0) {
-            list.innerHTML = '<div class="empty-message">No appointments found</div>';
-            return;
-        }
+    fetch(`/api/appointments?studentId=${currentUser.id}`)
+  .then(res => {
+    if (!res.ok) throw new Error('Failed to fetch appointments');
+    return res.json();
+  })
+  .then(data => {
+    appointments = data;         // store in memory
+    loadAppointments('all');     // render immediately
+  })
+  .catch(err => {
+    console.error(err);
+    document.getElementById('appointmentsList')
+      .innerHTML = '<div class="empty-message">Could not load appointments.</div>';
+  });
 
-        list.innerHTML = sorted.map(app => `
-            <div class="appointment-card ${app.status}">
-                <h3>${app.type}</h3>
-                <p><strong>Date:</strong> ${formatDate(app.date)}</p>
-                <p><strong>Time:</strong> ${formatTime(app.time)}</p>
-                <p><strong>Status:</strong> <span class="status-${app.status}">${app.status}</span></p>
-                <p><strong>Symptoms:</strong> ${app.symptoms}</p>
-                ${app.status === 'pending' ? `
-                    <div class="form-actions">
-                        <button onclick="editAppointment(${app.id})" class="secondary-btn">
-                            <i class="fas fa-edit"></i> Edit
-                        </button>
-                        <button onclick="deleteAppointment(${app.id})" class="danger-btn">
-                            <i class="fas fa-trash"></i> Delete
-                        </button>
-                    </div>
-                ` : app.reason ? `<p class="reason"><strong>Reason:</strong> ${app.reason}</p>` : ''}
-            </div>
-        `).join('');
-    }
+ function loadAppointments(filter = 'all') {
+  const list = document.getElementById('appointmentsList');
+
+  // Filter & sort directly on the in-memory array
+  const filtered = appointments
+    .filter(a => a.student_id === Number(currentUser.id) &&
+                 (filter === 'all' || a.status === filter));
+  const sorted = filtered
+    .sort((a, b) => new Date(b.appointment_date) - new Date(a.appointment_date));
+
+  if (sorted.length === 0) {
+    list.innerHTML = '<div class="empty-message">No appointments found</div>';
+    return;
+  }
+
+  list.innerHTML = sorted.map(app => `
+    <div class="appointment-card ${app.status}">
+      <h3>${app.type}</h3>
+      <p><strong>Date:</strong> ${formatDate(app.appointment_date)}</p>
+      <p><strong>Time:</strong> ${formatTime(app.appointment_time)}</p>
+      <p><strong>Status:</strong> <span class="status-${app.status}">${app.status}</span></p>
+      <p><strong>Symptoms:</strong> ${app.reason || ''}</p>
+      ${app.status === 'pending' ? `
+        <div class="form-actions">
+          <button onclick="editAppointment(${app.id})" class="secondary-btn">
+            <i class="fas fa-edit"></i> Edit
+          </button>
+          <button onclick="deleteAppointment(${app.id})" class="danger-btn">
+            <i class="fas fa-trash"></i> Delete
+          </button>
+        </div>
+      ` : app.reason ? `<p class="reason"><strong>Reason:</strong> ${app.reason}</p>` : ''}
+    </div>
+  `).join('');
+}
 
     function resetForm() {
         appointmentForm.reset();
