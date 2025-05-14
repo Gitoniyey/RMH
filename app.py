@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, jsonify, session, flash
 from supabase import create_client
 import os
 from dotenv import load_dotenv
@@ -14,13 +14,22 @@ print("Supabase Key:", SUPABASE_KEY)
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 app = Flask(__name__)
+app.secret_key = os.environ.get('SECRET_KEY', 'dev')  
 
 @app.route('/')
 def home():
     return render_template('universityclinic.html')
 
-@app.route('/login')
+@app.route('/login', methods=['GET', 'POST'])
 def login():
+    if request.method == 'POST':
+        student_id = request.form.get('studentId', type=int)
+
+
+        # **This is the crucial line**:
+        session['student_id'] = student_id
+        return redirect(url_for('studentdash'))
+
     return render_template('login.html')
 
 @app.route('/about')
@@ -34,6 +43,110 @@ def contact():
 @app.route('/studentdash')
 def studentdash():
     return render_template('studentdash.html')
+
+@app.route("/api/appointments", methods=["GET"])
+def get_appointments():
+    student_id = session.get("student_id")
+    
+    # Get all appointments for the student
+    response = supabase.table("appointments2").select("*").eq("student_id", student_id).execute()
+    
+    return jsonify(response.data)
+
+@app.route("/api/appointments", methods=["POST"])
+def create_appointment():
+    student_id = session.get("student_id")
+    
+    data = request.json
+    appointment_date = data.get("appointment_date")
+    appointment_time = data.get("appointment_time")
+    appointment_type = data.get("appointment_type")
+    symptoms_reason = data.get("symptoms_reason")
+    
+    # Create new appointment
+    new_appointment = {
+        "student_id": student_id,
+        "appointment_date": appointment_date,
+        "appointment_time": appointment_time,
+        "appointment_type": appointment_type,
+        "symptoms_reason": symptoms_reason,
+        "status": "pending"
+    }
+    
+    response = supabase.table("appointments2").insert(new_appointment).execute()
+    
+    if response.data:
+        # Create notification for new appointment
+        notification = {
+            "student_id": student_id,
+            "message": f"You have booked a new {appointment_type} appointment on {appointment_date} at {appointment_time}.",
+            "type": "new_appointment",
+            "related_appointment_id": response.data[0]["appointment_id"]
+        }
+        
+        supabase.table("notifications2").insert(notification).execute()
+        
+        return jsonify({"success": True, "appointment": response.data[0]})
+    
+    return jsonify({"success": False, "error": "Failed to create appointment"}), 500
+
+@app.route("/api/appointments/<appointment_id>", methods=["DELETE"])
+def delete_appointment(appointment_id):
+    student_id = session.get("student_id")
+    
+    # Verify appointment belongs to student
+    response = supabase.table("appointments2").select("*").eq("appointment_id", appointment_id).eq("student_id", student_id).execute()
+    
+    if not response.data:
+        return jsonify({"success": False, "error": "Appointment not found or unauthorized"}), 404
+    
+    # Delete appointment
+    supabase.table("appointments2").delete().eq("appointment_id", appointment_id).execute()
+    
+    # Create notification for deleted appointment
+    notification = {
+        "student_id": student_id,
+        "message": "An appointment has been cancelled.",
+        "type": "cancelled_appointment"
+    }
+    
+    supabase.table("notifications2").insert(notification).execute()
+    
+    return jsonify({"success": True})
+
+@app.route("/api/notifications", methods=["GET"])
+def get_notifications():
+    student_id = session.get("student_id")
+    
+    # Get all notifications for the student
+    response = supabase.table("notifications2").select("*").eq("student_id", student_id).execute()
+    
+    return jsonify(response.data)
+
+@app.route("/api/notifications/mark-read", methods=["POST"])
+def mark_notifications_read():
+    student_id = session.get("student_id")
+    notification_ids = request.json.get("notification_ids", [])
+    
+    if notification_ids:
+        # Mark specific notifications as read
+        response = supabase.table("notifications2").update({"read_status": True}).in_("notification_id", notification_ids).eq("student_id", student_id).execute()
+    else:
+        # Mark all notifications as read
+        response = supabase.table("notifications2").update({"read_status": True}).eq("student_id", student_id).execute()
+    
+    return jsonify({"success": True})
+
+@app.route("/api/notifications/clear", methods=["DELETE"])
+def clear_notifications():
+    student_id = session.get("student_id")
+    
+    # Delete all notifications for the student
+    supabase.table("notifications2").delete().eq("student_id", student_id).execute()
+    
+    return jsonify({"success": True})
+
+
 
 @app.route('/admindash')
 def admindash():
@@ -73,7 +186,7 @@ def book_appointment():
     appointment_date = request.form.get('appointment_date')
     reason = request.form.get('reason')
 
-    response = supabase.table("appointments").insert([{
+    response = supabase.table("appointments2").insert([{
         "student_name": student_name,
         "student_id": student_id,
         "course": course,

@@ -1,320 +1,545 @@
-document.addEventListener('DOMContentLoaded', function () {
-    const currentUser = JSON.parse(localStorage.getItem('currentUser')) || {
-        id: '24-262549',
-        name: 'Antonette Jean Ignacio',
-        type: 'student'
-    };
+// studentdash.js
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize page
+    initDashboard();
+    loadStudentInfo();
+    loadAppointments();
+    loadNotifications();
+    setupEventListeners();
+});
 
-    const navItems = document.querySelectorAll('.nav-item');
-    const pages = document.querySelectorAll('.page');
-    const appointmentForm = document.getElementById('appointmentForm');
-    const clearFormBtn = document.getElementById('clearFormBtn');
-    const clearAllBtn = document.getElementById('clearAllBtn');
-    const statusFilter = document.getElementById('statusFilter');
-    const studentNameInput = document.getElementById('studentName');
-    const studentIdInput = document.getElementById('studentId');
-    const submitBtnText = document.getElementById('submitBtnText');
-    const currentPageTitle = document.getElementById('currentPageTitle');
-    const notificationBadge = document.getElementById('notificationCount');
-
-    studentNameInput.value = currentUser.name;
-    studentIdInput.value = currentUser.id;
-    studentNameInput.readOnly = true;
-    studentIdInput.readOnly = true;
-
-    document.querySelector('.profile-section #studentName').textContent = currentUser.name;
-    document.querySelector('.profile-section #studentId').textContent = `ID: ${currentUser.id}`;
-
-    navItems.forEach(item => {
-        item.addEventListener('click', function (e) {
-            if (this.classList.contains('logout')) {
-                logout();
-                return;
-            }
-
+// Dashboard initialization
+function initDashboard() {
+    // Set the active navigation menu item
+    document.querySelectorAll('.nav-item').forEach(navItem => {
+        navItem.addEventListener('click', function(e) {
             e.preventDefault();
-            navItems.forEach(i => i.classList.remove('active'));
+            
+            // Remove active class from all nav items
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            
+            // Add active class to clicked nav item
             this.classList.add('active');
-
-            const targetPage = this.getAttribute('data-page');
-            switchPage(targetPage);
+            
+            // Hide all pages
+            document.querySelectorAll('.page').forEach(page => {
+                page.classList.remove('active');
+            });
+            
+            // Show selected page
+            const pageId = this.getAttribute('data-page');
+            document.getElementById(pageId).classList.add('active');
+            
+            // Update page title
+            const pageTitles = {
+                'appointments': 'My Appointments',
+                'book': 'Book New Appointment',
+                'notifications': 'Notifications'
+            };
+            document.getElementById('currentPageTitle').textContent = pageTitles[pageId];
         });
     });
+}
 
-    function logout() {
-        localStorage.removeItem('currentUser');
-        localStorage.removeItem('appointments');
-        localStorage.removeItem('studentNotifications');
-        localStorage.removeItem('adminNotifications');
-        window.location.href = '/login';
-    }
-
-    function switchPage(pageId) {
-        pages.forEach(p => p.classList.remove('active'));
-        document.getElementById(pageId).classList.add('active');
-
-        switch (pageId) {
-            case 'appointments':
-                currentPageTitle.textContent = 'My Appointments';
-                loadAppointments(statusFilter.value);
-                break;
-            case 'book':
-                currentPageTitle.textContent = 'Book New Appointment';
-                break;
-            case 'notifications':
-                currentPageTitle.textContent = 'Notifications';
-                loadStudentNotifications();
-                markAllNotificationsAsRead();
-                break;
-        }
-    }
-
-    appointmentForm.addEventListener('submit', function (e) {
-        e.preventDefault();
-
-        const formData = {
-            id: this.dataset.editId ? parseInt(this.dataset.editId) : Date.now(),
-            studentId: currentUser.id,
-            studentName: currentUser.name,
-            date: document.getElementById('appointmentDate').value,
-            time: document.getElementById('appointmentTime').value,
-            type: document.getElementById('appointmentType').value,
-            symptoms: document.getElementById('symptoms').value,
-            status: 'pending',
-            timestamp: new Date().toISOString(),
-            read: false
-        };
-
-        if (this.dataset.editId) {
-            updateAppointment(formData);
-        } else {
-            createAppointment(formData);
-        }
-
-        resetForm();
-        switchPage('appointments');
-    });
-
-    clearFormBtn.addEventListener('click', resetForm);
-
-    clearAllBtn.addEventListener('click', function () {
-        if (confirm('Are you sure you want to clear all appointments?')) {
-            const appointments = JSON.parse(localStorage.getItem('appointments')) || [];
-            const userAppointments = appointments.filter(app => app.studentId === currentUser.id);
-            if (userAppointments.length > 0) {
-                const adminNotification = {
-                    id: Date.now(),
-                    type: 'appointments_cleared',
-                    studentId: currentUser.id,
-                    studentName: currentUser.name,
-                    message: `${currentUser.name} has cleared all their appointments.`,
-                    timestamp: new Date().toISOString(),
-                    read: false
-                };
-
-                const adminNotifications = JSON.parse(localStorage.getItem('adminNotifications')) || [];
-                adminNotifications.push(adminNotification);
-                localStorage.setItem('adminNotifications', JSON.stringify(adminNotifications));
-
-                createStudentNotification({
-                    studentId: currentUser.id,
-                    message: `You cleared all your appointments.`
-                });
+// Load student information
+function loadStudentInfo() {
+    // In a real app, this would come from the server
+    // Using session data from Flask backend
+    fetch('/api/student/info')
+        .then(response => response.json())
+        .then(data => {
+            document.querySelectorAll('#studentName').forEach(el => {
+                el.textContent = data.full_name;
+            });
+            document.querySelectorAll('#studentId').forEach(el => {
+                if (el.tagName === 'P') {
+                    el.textContent = 'ID: ' + data.student_id;
+                } else if (el.tagName === 'INPUT') {
+                    el.value = data.student_id;
+                }
+            });
+            
+            // If we have an input with student name in the form
+            const studentNameInput = document.querySelector('#appointmentForm #studentName');
+            if (studentNameInput) {
+                studentNameInput.value = data.full_name;
             }
-
-            const updated = appointments.filter(app => app.studentId !== currentUser.id);
-            localStorage.setItem('appointments', JSON.stringify(updated));
-            loadAppointments();
-            showNotification('All appointments cleared!');
-        }
-    });
-
-    statusFilter.addEventListener('change', function () {
-        loadAppointments(this.value);
-    });
-
-    function createAppointment(data) {
-        const appointments = JSON.parse(localStorage.getItem('appointments')) || [];
-        appointments.push(data);
-        localStorage.setItem('appointments', JSON.stringify(appointments));
-
-        const adminNotification = {
-            id: Date.now(),
-            type: 'new_appointment',
-            appointmentId: data.id,
-            studentId: data.studentId,
-            studentName: data.studentName,
-            message: `New appointment request from ${data.studentName} for ${formatDate(data.date)} at ${formatTime(data.time)}.`,
-            timestamp: new Date().toISOString(),
-            read: false
-        };
-
-        const adminNotifications = JSON.parse(localStorage.getItem('adminNotifications')) || [];
-        adminNotifications.push(adminNotification);
-        localStorage.setItem('adminNotifications', JSON.stringify(adminNotifications));
-
-        createStudentNotification({
-            studentId: data.studentId,
-            message: `You booked a new appointment on ${formatDate(data.date)} at ${formatTime(data.time)}.`
+        })
+        .catch(error => {
+            console.error('Error loading student info:', error);
         });
+}
 
-        showNotification('Appointment booked!');
-    }
-
-    function updateAppointment(data) {
-        const appointments = JSON.parse(localStorage.getItem('appointments')) || [];
-        const index = appointments.findIndex(app => app.id === data.id);
-
-        if (index !== -1) {
-            const old = appointments[index];
-            data.status = old.status;
-            data.reason = old.reason;
-
-            appointments[index] = data;
-            localStorage.setItem('appointments', JSON.stringify(appointments));
-
-            const changes = [];
-            if (old.date !== data.date) changes.push(`date from ${formatDate(old.date)} to ${formatDate(data.date)}`);
-            if (old.time !== data.time) changes.push(`time from ${formatTime(old.time)} to ${formatTime(data.time)}`);
-            if (old.type !== data.type) changes.push(`type from ${old.type} to ${data.type}`);
-
-            if (changes.length > 0) {
-                const adminNotification = {
-                    id: Date.now(),
-                    type: 'appointment_updated',
-                    appointmentId: data.id,
-                    studentId: data.studentId,
-                    studentName: data.studentName,
-                    message: `${data.studentName} updated appointment: ${changes.join(', ')}.`,
-                    timestamp: new Date().toISOString(),
-                    read: false
-                };
-
-                const adminNotifications = JSON.parse(localStorage.getItem('adminNotifications')) || [];
-                adminNotifications.push(adminNotification);
-                localStorage.setItem('adminNotifications', JSON.stringify(adminNotifications));
-
-                createStudentNotification({
-                    studentId: data.studentId,
-                    message: `You updated your appointment: ${changes.join(', ')}.`
-                });
-            }
-
-            showNotification('Appointment updated!');
-        }
-    }
-
-    function createStudentNotification(data) {
-        const studentNotifications = JSON.parse(localStorage.getItem('studentNotifications')) || [];
-        studentNotifications.push({
-            id: Date.now(),
-            studentId: data.studentId,
-            message: data.message,
-            timestamp: new Date().toISOString(),
-            read: false
+// Load appointments
+function loadAppointments() {
+    fetch('/api/appointments')
+        .then(response => response.json())
+        .then(appointments => {
+            displayAppointments(appointments);
+            updateStatusFilter();
+        })
+        .catch(error => {
+            console.error('Error loading appointments:', error);
         });
-        localStorage.setItem('studentNotifications', JSON.stringify(studentNotifications));
+}
+
+// Display appointments in the grid
+function displayAppointments(appointments) {
+    const appointmentsList = document.getElementById('appointmentsList');
+    appointmentsList.innerHTML = '';
+    
+    if (appointments.length === 0) {
+        appointmentsList.innerHTML = '<div class="no-appointments">No appointments found</div>';
+        return;
     }
-
-    function loadAppointments(filter = 'all') {
-        const list = document.getElementById('appointmentsList');
-        const appointments = JSON.parse(localStorage.getItem('appointments')) || [];
-        const filtered = appointments.filter(a => a.studentId === currentUser.id && (filter === 'all' || a.status === filter));
-        const sorted = [...filtered].sort((a, b) => new Date(b.date) - new Date(a.date));
-
-        if (sorted.length === 0) {
-            list.innerHTML = '<div class="empty-message">No appointments found</div>';
-            return;
-        }
-
-        list.innerHTML = sorted.map(app => `
-            <div class="appointment-card ${app.status}">
-                <h3>${app.type}</h3>
-                <p><strong>Date:</strong> ${formatDate(app.date)}</p>
-                <p><strong>Time:</strong> ${formatTime(app.time)}</p>
-                <p><strong>Status:</strong> <span class="status-${app.status}">${app.status}</span></p>
-                <p><strong>Symptoms:</strong> ${app.symptoms}</p>
-                ${app.status === 'pending' ? `
-                    <div class="form-actions">
-                        <button onclick="editAppointment(${app.id})" class="secondary-btn">
-                            <i class="fas fa-edit"></i> Edit
-                        </button>
-                        <button onclick="deleteAppointment(${app.id})" class="danger-btn">
-                            <i class="fas fa-trash"></i> Delete
-                        </button>
-                    </div>
-                ` : app.reason ? `<p class="reason"><strong>Reason:</strong> ${app.reason}</p>` : ''}
-            </div>
-        `).join('');
-    }
-
-    function resetForm() {
-        appointmentForm.reset();
-        delete appointmentForm.dataset.editId;
-        studentNameInput.value = currentUser.name;
-        studentIdInput.value = currentUser.id;
-        submitBtnText.textContent = 'Book Appointment';
-    }
-
-    function showNotification(msg) {
-        alert(msg);
-    }
-
-    function formatDate(dateStr) {
-        return new Date(dateStr).toLocaleDateString('en-US', {
+    
+    appointments.forEach(appointment => {
+        // Format date for display
+        const appointmentDate = new Date(appointment.appointment_date);
+        const formattedDate = appointmentDate.toLocaleDateString('en-US', {
             year: 'numeric',
             month: 'long',
             day: 'numeric'
         });
-    }
-
-    function formatTime(timeStr) {
-        const [h, m] = timeStr.split(':');
-        const hour = parseInt(h);
-        const ampm = hour >= 12 ? 'PM' : 'AM';
-        return `${(hour % 12 || 12)}:${m} ${ampm}`;
-    }
-
-    function updateNotificationCount() {
-        const studentNotifications = JSON.parse(localStorage.getItem('studentNotifications')) || [];
-        const unread = studentNotifications.filter(n => !n.read && n.studentId === currentUser.id);
-        notificationBadge.textContent = unread.length || '';
-        notificationBadge.style.display = unread.length > 0 ? 'inline-block' : 'none';
-    }
-
-    function loadStudentNotifications() {
-        const studentNotifications = JSON.parse(localStorage.getItem('studentNotifications')) || [];
-        const studentNotifs = studentNotifications.filter(n => n.studentId === currentUser.id);
-        const list = document.getElementById('notificationList');
-
-        if (!studentNotifs.length) {
-            list.innerHTML = '<div class="empty-message">No notifications</div>';
-            return;
-        }
-
-        list.innerHTML = studentNotifs.map(n => `
-            <div class="notification-card ${n.read ? '' : 'unread'}">
-                <p>${n.message}</p>
-                <small>${new Date(n.timestamp).toLocaleString()}</small>
+        
+        // Format time for display
+        const timeArr = appointment.appointment_time.split(':');
+        const hours = parseInt(timeArr[0]);
+        const minutes = timeArr[1];
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        const formattedHours = hours % 12 || 12;
+        const formattedTime = `${formattedHours}:${minutes} ${ampm}`;
+        
+        // Create appointment card
+        const appointmentCard = document.createElement('div');
+        appointmentCard.className = `appointment-card ${appointment.status}`;
+        appointmentCard.dataset.id = appointment.appointment_id;
+        
+        appointmentCard.innerHTML = `
+            <div class="appointment-status">
+                <span class="status-indicator"></span>
+                <span class="status-text">${appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1)}</span>
             </div>
-        `).join('');
+            <div class="appointment-type">
+                <i class="fas ${getAppointmentTypeIcon(appointment.appointment_type)}"></i>
+                <h3>${appointment.appointment_type.charAt(0).toUpperCase() + appointment.appointment_type.slice(1)}</h3>
+            </div>
+            <div class="appointment-datetime">
+                <div class="appointment-date">
+                    <i class="fas fa-calendar-day"></i>
+                    <span>${formattedDate}</span>
+                </div>
+                <div class="appointment-time">
+                    <i class="fas fa-clock"></i>
+                    <span>${formattedTime}</span>
+                </div>
+            </div>
+            <div class="appointment-reason">
+                <h4>Reason:</h4>
+                <p>${appointment.symptoms_reason}</p>
+            </div>
+            <div class="appointment-actions">
+                ${appointment.status === 'pending' ? 
+                    `<button class="cancel-btn" onclick="cancelAppointment('${appointment.appointment_id}')">
+                        <i class="fas fa-times"></i> Cancel
+                    </button>` : ''}
+            </div>
+        `;
+        
+        appointmentsList.appendChild(appointmentCard);
+    });
+}
+
+// Get appropriate icon for appointment type
+function getAppointmentTypeIcon(type) {
+    const icons = {
+        'medical': 'fa-stethoscope',
+        'consultation': 'fa-comment-medical',
+        'emergency': 'fa-ambulance',
+        'followup': 'fa-clipboard-check'
+    };
+    
+    return icons[type] || 'fa-calendar-check';
+}
+
+// Update the status filter functionality
+function updateStatusFilter() {
+    const statusFilter = document.getElementById('statusFilter');
+    
+    statusFilter.addEventListener('change', function() {
+        const selectedStatus = this.value;
+        
+        const appointmentCards = document.querySelectorAll('.appointment-card');
+        appointmentCards.forEach(card => {
+            if (selectedStatus === 'all' || card.classList.contains(selectedStatus)) {
+                card.style.display = 'block';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+    });
+}
+
+// Cancel an appointment
+function cancelAppointment(appointmentId) {
+    if (confirm('Are you sure you want to cancel this appointment?')) {
+        fetch(`/api/appointments/${appointmentId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Remove the appointment card from the DOM
+                const appointmentCard = document.querySelector(`.appointment-card[data-id="${appointmentId}"]`);
+                if (appointmentCard) {
+                    appointmentCard.remove();
+                }
+                
+                // Check if there are no more appointments
+                const appointmentsList = document.getElementById('appointmentsList');
+                if (appointmentsList.children.length === 0) {
+                    appointmentsList.innerHTML = '<div class="no-appointments">No appointments found</div>';
+                }
+                
+                // Reload notifications (as a new notification about cancellation may have been created)
+                loadNotifications();
+            } else {
+                alert('Failed to cancel appointment. Please try again.');
+            }
+        })
+        .catch(error => {
+            console.error('Error cancelling appointment:', error);
+            alert('An error occurred while cancelling the appointment.');
+        });
     }
+}
 
-    function markAllNotificationsAsRead() {
-        const notifs = JSON.parse(localStorage.getItem('studentNotifications')) || [];
-        const updated = notifs.map(n => n.studentId === currentUser.id ? { ...n, read: true } : n);
-        localStorage.setItem('studentNotifications', JSON.stringify(updated));
-        updateNotificationCount();
+// Load notifications
+function loadNotifications() {
+    fetch('/api/notifications')
+        .then(response => response.json())
+        .then(notifications => {
+            displayNotifications(notifications);
+            updateNotificationBadge(notifications);
+        })
+        .catch(error => {
+            console.error('Error loading notifications:', error);
+        });
+}
+
+// Display notifications
+function displayNotifications(notifications) {
+    const notificationList = document.getElementById('notificationList');
+    notificationList.innerHTML = '';
+    
+    if (notifications.length === 0) {
+        notificationList.innerHTML = '<div class="no-notifications">No notifications</div>';
+        return;
     }
+    
+    notifications.forEach(notification => {
+        const notificationItem = document.createElement('div');
+        notificationItem.className = `notification-item ${notification.read_status ? 'read' : 'unread'}`;
+        notificationItem.dataset.id = notification.notification_id;
+        
+        const createdDate = new Date(notification.created_at);
+        const formattedDate = createdDate.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+        });
+        
+        const formattedTime = createdDate.toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+        
+        notificationItem.innerHTML = `
+            <div class="notification-header">
+                <div class="notification-type">
+                    <i class="fas ${getNotificationTypeIcon(notification.type)}"></i>
+                    <span>${formatNotificationType(notification.type)}</span>
+                </div>
+                <div class="notification-date">
+                    ${formattedDate} at ${formattedTime}
+                </div>
+            </div>
+            <div class="notification-message">
+                ${notification.message}
+            </div>
+            ${notification.related_appointment_id ? 
+                `<div class="notification-actions">
+                    <button class="view-appointment-btn" onclick="viewAppointment('${notification.related_appointment_id}')">
+                        <i class="fas fa-eye"></i> View Appointment
+                    </button>
+                </div>` : ''}
+        `;
+        
+        notificationList.appendChild(notificationItem);
+        
+        // Mark notification as read when clicked
+        notificationItem.addEventListener('click', function() {
+            if (!this.classList.contains('read')) {
+                markNotificationAsRead(notification.notification_id);
+                this.classList.add('read');
+                this.classList.remove('unread');
+                
+                // Update notification badge
+                updateNotificationBadge(notifications.map(n => {
+                    if (n.notification_id === notification.notification_id) {
+                        n.read_status = true;
+                    }
+                    return n;
+                }));
+            }
+        });
+    });
+    
+    // Add Mark All as Read button
+    const markAllReadBtn = document.createElement('button');
+    markAllReadBtn.className = 'mark-all-read-btn';
+    markAllReadBtn.innerHTML = '<i class="fas fa-check-double"></i> Mark All as Read';
+    markAllReadBtn.addEventListener('click', markAllNotificationsAsRead);
+    
+    const clearAllBtn = document.createElement('button');
+    clearAllBtn.className = 'clear-all-btn';
+    clearAllBtn.innerHTML = '<i class="fas fa-trash"></i> Clear All';
+    clearAllBtn.addEventListener('click', clearAllNotifications);
+    
+    const actionsDiv = document.createElement('div');
+    actionsDiv.className = 'notification-global-actions';
+    actionsDiv.appendChild(markAllReadBtn);
+    actionsDiv.appendChild(clearAllBtn);
+    
+    notificationList.insertBefore(actionsDiv, notificationList.firstChild);
+}
 
-    // Initial Load
-    loadAppointments();
-    updateNotificationCount();
+// Get appropriate icon for notification type
+function getNotificationTypeIcon(type) {
+    const icons = {
+        'new_appointment': 'fa-calendar-plus',
+        'cancelled_appointment': 'fa-calendar-times',
+        'appointment_status': 'fa-calendar-check',
+        'reminder': 'fa-bell'
+    };
+    
+    return icons[type] || 'fa-bell';
+}
 
-    setInterval(() => {
-        if (document.getElementById('appointments').classList.contains('active')) {
-            loadAppointments(statusFilter.value);
+// Format notification type for display
+function formatNotificationType(type) {
+    const types = {
+        'new_appointment': 'New Appointment',
+        'cancelled_appointment': 'Cancelled Appointment',
+        'appointment_status': 'Status Update',
+        'reminder': 'Reminder'
+    };
+    
+    return types[type] || type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+}
+
+// Mark a notification as read
+function markNotificationAsRead(notificationId) {
+    fetch('/api/notifications/mark-read', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            notification_ids: [notificationId]
+        })
+    })
+    .catch(error => {
+        console.error('Error marking notification as read:', error);
+    });
+}
+
+// Mark all notifications as read
+function markAllNotificationsAsRead() {
+    fetch('/api/notifications/mark-read', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({})
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Update all notification items in the DOM
+            document.querySelectorAll('.notification-item').forEach(item => {
+                item.classList.add('read');
+                item.classList.remove('unread');
+            });
+            
+            // Update notification badge
+            updateNotificationBadge([]);
         }
-        updateNotificationCount();
-    }, 10000);
-});
+    })
+    .catch(error => {
+        console.error('Error marking all notifications as read:', error);
+    });
+}
+
+// Clear all notifications
+function clearAllNotifications() {
+    if (confirm('Are you sure you want to clear all notifications? This cannot be undone.')) {
+        fetch('/api/notifications/clear', {
+            method: 'DELETE'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Clear notification list in the DOM
+                const notificationList = document.getElementById('notificationList');
+                notificationList.innerHTML = '<div class="no-notifications">No notifications</div>';
+                
+                // Update notification badge
+                updateNotificationBadge([]);
+            }
+        })
+        .catch(error => {
+            console.error('Error clearing notifications:', error);
+        });
+    }
+}
+
+// Update notification badge
+function updateNotificationBadge(notifications) {
+    const unreadCount = notifications.filter(notification => !notification.read_status).length;
+    const notificationBadge = document.getElementById('notificationCount');
+    
+    if (unreadCount > 0) {
+        notificationBadge.textContent = unreadCount;
+        notificationBadge.style.display = 'block';
+    } else {
+        notificationBadge.style.display = 'none';
+    }
+}
+
+// Navigate to specific appointment from notification
+function viewAppointment(appointmentId) {
+    // Switch to appointments page
+    document.querySelector('.nav-item[data-page="appointments"]').click();
+    
+    // Highlight the specific appointment
+    setTimeout(() => {
+        const appointmentCard = document.querySelector(`.appointment-card[data-id="${appointmentId}"]`);
+        if (appointmentCard) {
+            appointmentCard.scrollIntoView({ behavior: 'smooth' });
+            appointmentCard.classList.add('highlight');
+            
+            setTimeout(() => {
+                appointmentCard.classList.remove('highlight');
+            }, 3000);
+        }
+    }, 300);
+}
+
+// Setup event listeners
+function setupEventListeners() {
+    // Appointment form submission
+    const appointmentForm = document.getElementById('appointmentForm');
+    if (appointmentForm) {
+        appointmentForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const appointmentData = {
+                appointment_date: this.querySelector('#appointmentDate').value,
+                appointment_time: this.querySelector('#appointmentTime').value,
+                appointment_type: this.querySelector('#appointmentType').value,
+                symptoms_reason: this.querySelector('#symptoms').value
+            };
+            
+            // Submit appointment to server
+            fetch('/api/appointments', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(appointmentData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Clear form
+                    appointmentForm.reset();
+                    
+                    // Show success message
+                    alert('Appointment booked successfully!');
+                    
+                    // Switch to appointments page
+                    document.querySelector('.nav-item[data-page="appointments"]').click();
+                    
+                    // Reload appointments and notifications
+                    loadAppointments();
+                    loadNotifications();
+                } else {
+                    alert('Failed to book appointment. Please try again.');
+                }
+            })
+            .catch(error => {
+                console.error('Error booking appointment:', error);
+                alert('An error occurred while booking the appointment.');
+            });
+        });
+    }
+    
+    // Clear form button
+    const clearFormBtn = document.getElementById('clearFormBtn');
+    if (clearFormBtn) {
+        clearFormBtn.addEventListener('click', function() {
+            document.getElementById('appointmentForm').reset();
+        });
+    }
+    
+    // Clear all appointments button
+    const clearAllBtn = document.getElementById('clearAllBtn');
+    if (clearAllBtn) {
+        clearAllBtn.addEventListener('click', function() {
+            if (confirm('Are you sure you want to cancel all pending appointments? This cannot be undone.')) {
+                // Get all pending appointment IDs
+                const pendingAppointments = Array.from(document.querySelectorAll('.appointment-card.pending')).map(card => card.dataset.id);
+                
+                if (pendingAppointments.length === 0) {
+                    alert('No pending appointments to cancel.');
+                    return;
+                }
+                
+                // Create promises for all cancellations
+                const cancellationPromises = pendingAppointments.map(id => {
+                    return fetch(`/api/appointments/${id}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    }).then(response => response.json());
+                });
+                
+                // Wait for all cancellations to complete
+                Promise.all(cancellationPromises)
+                    .then(results => {
+                        // Reload appointments and notifications
+                        loadAppointments();
+                        loadNotifications();
+                        
+                        alert('All pending appointments have been cancelled.');
+                    })
+                    .catch(error => {
+                        console.error('Error cancelling appointments:', error);
+                        alert('An error occurred while cancelling appointments.');
+                    });
+            }
+        });
+    }
+}
+
+// Logout function
+function logout() {
+    window.location.href = '/login';
+}
