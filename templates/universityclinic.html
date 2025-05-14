@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RizalianMedHealth - University Clinic Services</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/universityclinic.css') }}">
+</head>
+<body>
+    <header>
+        <div class="logo-container">
+            <img src="/static/images/logo.jpg" alt="RizalianMedHealth Logo" class="logo">
+            <h1>RizalianMedHealth</h1>
+        </div>
+        <nav class="main-nav">
+            <ul>
+                <ul>
+                    <li><a href="{{ url_for('home') }}" class="active">Home</a></li>
+                    <li><a href="{{ url_for('login') }}">Login</a></li>
+                    <li><a href="{{ url_for('about') }}">About</a></li>
+                    <li><a href="{{ url_for('contact') }}">Contact</a></li>
+                    <li><a href="{{ url_for('register')}}">Register</a></li>
+                </ul>                
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <section class="hero">
+            <h2>Welcome to RizalianMedHealth</h2>
+            <p>Book your appointment with our healthcare professionals quickly and easily.</p>
+            <p>Our online reservation system helps you avoid long waiting times and ensures you get the care you need when you need it.</p>
+        </section>
+
+        <section class="services">
+            <h2>Our Services</h2>
+            <div class="service-grid">
+                <div class="service-card">
+                    <img src="/static/images/medical.jpg" alt="Medical Services">
+                    <h3>Medical Services</h3>
+                    <p>General check-ups and medical certificates</p>
+                </div>
+                <div class="service-card">
+                    <img src="/static/images/consultation.jpg" alt="Consultation">
+                    <h3>Consultation</h3>
+                    <p>Professional healthcare consultation</p>
+                </div>
+                <div class="service-card">
+                    <img src="/static/images/emergency.jpg" alt="First Aid">
+                    <h3>First Aid</h3>
+                    <p>Emergency medical assistance</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="features">
+            <h2>Why Choose Online Booking?</h2>
+            <div class="feature-grid">
+                <div class="feature">
+                    <h3>Save Time</h3>
+                    <p>Skip the long queues and book instantly</p>
+                </div>
+                <div class="feature">
+                    <h3>Manage Appointments</h3>
+                    <p>View, modify, or cancel your bookings</p>
+                </div>
+                <div class="feature">
+                    <h3>Quick Access</h3>
+                    <p>Easy access to medical services</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="footer-content">
+            <div class="footer-links">
+                <a href="{{ url_for('privacy') }}">Privacy Policy</a>
+                <a href="{{ url_for('terms') }}">Terms of Service</a>
+            </div>
+            <p>&copy; 2025 RizalianMedHealth. All rights reserved.</p>
+        </div>
+    </footer>
+    <script src="{{ url_for('static', filename='js/universityclinic.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Dashboard - RizalianClinic</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/studentdash.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="dashboard-container">
+        <aside class="sidebar">
+            <div class="profile-section">
+                <img src="{{ url_for('static', filename='images/student.png') }}" alt="Profile" class="profile-img">
+                <h3 id="studentName">Student Name</h3>
+                <p id="studentId">ID: 12345</p>
+            </div>
+            <nav class="nav-menu">
+                <a href="#" class="nav-item active" data-page="appointments">
+                    <i class="fas fa-calendar-alt"></i> My Appointments
+                </a>
+                <a href="#" class="nav-item" data-page="book">
+                    <i class="fas fa-plus-circle"></i> New Appointment
+                </a>
+                <a href="#" class="nav-item" data-page="notifications">
+                    <i class="fas fa-bell"></i> Notifications
+                    <span class="notification-badge" id="notificationCount">0</span>
+                </a>
+                <a href="#" class="nav-item logout" onclick="logout()">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </a>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+            <div class="page-header">
+                <h2 id="currentPageTitle">My Appointments</h2>
+            </div>
+
+            <section id="appointments" class="page active">
+                <div class="appointments-container">
+                    <div class="filter-bar">
+                        <select id="statusFilter">
+                            <option value="all">All Appointments</option>
+                            <option value="pending">Pending</option>
+                            <option value="approved">Approved</option>
+                            <option value="rejected">Rejected</option>
+                        </select>
+                        <button id="clearAllBtn" class="danger-btn">
+                            <i class="fas fa-trash"></i> Clear All
+                        </button>
+                    </div>
+                    <div id="appointmentsList" class="appointments-grid"></div>
+                </div>
+            </section>
+
+            <section id="book" class="page">
+                <form id="appointmentForm" class="booking-form">
+                    <div class="form-group">
+                        <label for="studentName">Full Name:</label>
+                        <input type="text" id="studentName" required>
+                    </div>
+    
+                    <div class="form-group">
+                        <label for="studentId">Student ID:</label>
+                        <input type="text" id="studentId" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="appointmentDate">Date</label>
+                        <input type="date" id="appointmentDate" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="appointmentTime">Time</label>
+                        <select id="appointmentTime" required>
+                            <option value="">Select Time</option>
+                            <option value="09:00">9:00 AM</option>
+                            <option value="10:00">10:00 AM</option>
+                            <option value="11:00">11:00 AM</option>
+                            <option value="14:00">2:00 PM</option>
+                            <option value="15:00">3:00 PM</option>
+                            <option value="16:00">4:00 PM</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="appointmentType">Type of Appointment</label>
+                        <select id="appointmentType" required>
+                            <option value="">Select Type</option>
+                            <option value="medical">Medical</option>
+                            <option value="consultation">Consultation</option>
+                            <option value="emergency">Emergency</option>
+                            <option value="followup">Follow-up</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="symptoms">Symptoms/Reason</label>
+                        <textarea id="symptoms" rows="4" required></textarea>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="primary-btn">
+                            <i class="fas fa-save"></i> 
+                            <span id="submitBtnText">Book Appointment</span>
+                        </button>
+                        <button type="button" id="clearFormBtn" class="secondary-btn">
+                            <i class="fas fa-undo"></i> Clear Form
+                        </button>
+                    </div>
+                </form>
+            </section>
+
+            <section id="notifications" class="page">
+                <div id="notificationList" class="notifications-container"></div>
+            </section>
+        </main>
+    </div>
+    <script src="{{ url_for('static', filename='js/studentdash.js') }}"></script>
+</body>
+</html>

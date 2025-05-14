@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - RizalianMedHealth</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-box">
+            <h2>WELCOME</h2>
+            <div class="login-options">
+                <button class="login-toggle active" data-type="student">Student</button>
+                <button class="login-toggle" data-type="admin">Admin</button>
+            </div>
+
+            <!-- Student Login Form -->
+            <form id="studentLoginForm" class="login-form">
+                <div class="form-group">
+                    <label for="studentId">Student ID</label>
+                    <input type="text" id="studentId" required>
+                </div>
+                <div class="form-group">
+                    <label for="studentPassword">Password</label>
+                    <input type="password" id="studentPassword" required>
+                </div>
+                <button type="submit" class="login-btn">Login as Student</button>
+            </form>
+
+            <!-- Admin Login Form (hidden by default) -->
+            <form id="adminLoginForm" class="login-form hidden">
+                <div class="form-group">
+                    <label for="adminUsername">Username</label>
+                    <input type="text" id="adminUsername" required>
+                </div>
+                <div class="form-group">
+                    <label for="adminPassword">Password</label>
+                    <input type="password" id="adminPassword" required>
+                </div>
+                <button type="submit" class="login-btn">Login as Admin</button>
+            </form>
+
+            <!-- Registration Form -->
+            <div class="registration-link">
+                <p>Don't have an account? <a href="/register">Register here</a></p>
+            </div>
+
+            <div class="login-footer">
+                <a href="#" class="forgot-password">Forgot Password?</a>
+                <a href="/" class="back-home">Back to Home</a>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/login.js') }}"></script>
+</body>
+</html>

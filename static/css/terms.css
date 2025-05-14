@@ -1,0 +1,126 @@
+/* Terms of Service Styles */
+.terms-content {
+    padding: 2rem;
+    animation: fadeIn 0.8s ease-out;
+    background: url('../images/background1.jpg');
+    background-size: cover;
+}
+
+.terms-header {
+    text-align: center;
+    margin-bottom: 3rem;
+}
+
+.terms-header h1 {
+    color: #ffd700;
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+}
+
+.last-updated {
+    color: white;
+    text-align: center;
+}
+
+.terms-section {
+    margin: 2rem 0;
+    padding: 1.5rem;
+    background: #003366;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    transform: translateY(20px);
+    opacity: 0;
+    animation: slideUp 0.6s ease-out forwards;
+}
+
+.terms-section:nth-child(2) { animation-delay: 0.2s; }
+.terms-section:nth-child(3) { animation-delay: 0.4s; }
+.terms-section:nth-child(4) { animation-delay: 0.6s; }
+.terms-section:nth-child(5) { animation-delay: 0.8s; }
+
+.terms-section h2 {
+    color: #ffd700;
+    margin-bottom: 1.5rem;
+    font-size: 1.3rem;
+    border-bottom: 2px solid rgba(255, 87, 34, 0.2);
+    padding-bottom: 0.5rem;
+}
+
+.terms-section ul {
+    list-style: none;
+    padding: 0;
+}
+
+.terms-section ul li {
+    padding: 1rem;
+    margin: 0.8rem 0;
+    background: rgba(255, 255, 255, 0.9);
+    border-left: 3px solid goldenrod;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+    transition: all 0.3s ease;
+    transform: translateX(-20px);
+    opacity: 0;
+    animation: slideIn 0.5s ease-out forwards;
+    animation-delay: calc(var(--i, 0) * 0.1s + 0.3s);
+}
+
+.terms-section ul li:hover {
+    transform: translateX(10px);
+    background: rgba(255, 255, 255, 0.95);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+}
+
+.button-container {
+    text-align: center;
+    margin-top: 3rem;
+}
+
+.back-btn {
+    display: inline-block;
+    padding: 0.8rem 2rem;
+    background: rgb(240, 223, 94);
+    color: black;
+    text-decoration: none;
+    border-radius: 25px;
+    transition: all 0.3s ease;
+}
+
+.back-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 5px 15px rgba(255, 87, 34, 0.3);
+}
+
+@keyframes slideIn {
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideUp {
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    .terms-section {
+        padding: 1rem;
+    }
+
+    .terms-section h4 {
+        font-size: 1.2rem;
+    }
+
+    .terms-section ul li {
+        padding: 0.8rem;
+    }
+}

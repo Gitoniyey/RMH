@@ -1,0 +1,148 @@
+/* Privacy Policy Styles */
+.privacy-content {
+    padding: 2rem;
+    animation: fadeIn 0.8s ease-out;
+    background: url('../images/background1.jpg');
+    background-size: cover;
+}
+    
+.privacy-header {
+        text-align: center;
+        margin-bottom: 3rem;
+}
+    
+.privacy-header h1 {
+        color: #2c3e50;
+        font-size: 2rem;
+        margin-bottom: 0.5rem;
+}
+
+.privacy-header {
+    text-align: center;
+    margin-bottom: 3rem;
+    color: white;
+}
+
+.privacy-header h1 {
+    color: #ffd700;
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+}
+
+.privacy-section {
+    margin: 2rem 0;
+    padding: 1.5rem;
+    background: #003366;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    transform: translateY(20px);
+    opacity: 0;
+    animation: slideUp 0.6s ease-out forwards;
+}
+
+.privacy-section:nth-child(2) { animation-delay: 0.2s; }
+.privacy-section:nth-child(3) { animation-delay: 0.4s; }
+.privacy-section:nth-child(4) { animation-delay: 0.6s; }
+.privacy-section:nth-child(5) { animation-delay: 0.8s; }
+
+.privacy-section h2 {
+    color: #ffd700;
+    margin-bottom: 1.5rem;
+    font-size: 1.3rem;
+    border-bottom: 2px solid rgba(255, 87, 34, 0.2);
+    padding-bottom: 0.5rem;
+}
+
+.privacy-section ul {
+    list-style: none;
+    padding: 0;
+}
+
+.privacy-section ul li {
+    padding: 1rem;
+    margin: 0.8rem 0;
+    background: rgba(255, 255, 255, 0.9);
+    border-left: 3px solid goldenrod;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+    transition: all 0.3s ease;
+    transform: translateX(-20px);
+    opacity: 0;
+    animation: slideIn 0.5s ease-out forwards;
+    animation-delay: calc(var(--i, 0) * 0.1s + 0.3s);
+}
+
+.privacy-section ul li:hover {
+    transform: translateX(10px);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    background: rgba(255, 255, 255, 0.95);
+}
+
+.contact-info {
+    text-align: center;
+    margin: 3rem 0;
+    padding: 2rem;
+    background: rgba(255, 87, 34, 0.05);
+    border-radius: 10px;
+    animation: fadeIn 1s ease-out;
+    animation-delay: 1s;
+}
+
+.contact-info p {
+    margin: 0.5rem 0;
+    color: #333;
+}
+
+@keyframes slideIn {
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideUp {
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    .privacy-section {
+        padding: 1rem;
+    }
+
+    .privacy-section h4 {
+        font-size: 1.2rem;
+    }
+
+    .privacy-section ul li {
+        padding: 0.8rem;
+    }
+}
+
+.button-container {
+    text-align: center;
+    margin-top: 3rem;
+}
+
+.back-btn {
+    display: inline-block;
+    padding: 0.8rem 2rem;
+    background: rgb(240, 223, 94);
+    color: black;
+    text-decoration: none;
+    border-radius: 25px;
+    transition: all 0.3s ease;
+}
+
+.back-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 5px 15px rgba(255, 87, 34, 0.3);
+}

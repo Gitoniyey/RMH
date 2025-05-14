@@ -1,0 +1,95 @@
+/* Login Page Styles */
+.login-container {
+    color: white;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: url('../images/background1.jpg');
+}      
+
+.login-box {
+    background: linear-gradient(135deg, rgb(48, 122, 196), rgb(0, 0, 139));
+    backdrop-filter: blur(10px);
+    padding: 40px;
+    border-radius: 20px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    width: 100%;
+    max-width: 400px;
+    text-align: center;
+}
+
+
+
+.login-options {
+    display: flex;
+    gap: 10px;
+    margin: 20px 0;
+    justify-content: center;
+}
+
+.login-toggle {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+}
+
+.login-toggle.active {
+    background: rgba(255, 191, 0, 0.681);
+}
+
+.login-form {
+    text-align: left;
+}
+
+.login-form.hidden {
+    display: none;
+}
+
+.login-form .form-group {
+    margin-bottom: 20px;
+}
+
+.login-form label {
+    display: block;
+    margin-bottom: 8px;
+    color: white;
+}
+
+.login-form input {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+}
+
+.login-btn {
+    width: 100%;
+    padding: 12px;
+    background: rgba(255, 191, 0, 0.681);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background 0.3s ease;
+    margin-bottom: 20px;
+}
+
+.login-btn:hover {
+    background: rgba(255, 238, 0, 0.073);
+}
+
+.login-footer a {
+    margin-top: 20px;
+    color: white
+}
+
+.login-footer a:hover {
+    color: yellow;
+}

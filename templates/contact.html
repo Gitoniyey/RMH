@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contact Us - University Clinic</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/contact.css') }}">
+</head>
+<body>
+    <div class="contact-container">
+        <h1>Contact Us</h1>
+        
+        <div class="contact-info">
+            <div class="info-box">
+                <h2>Emergency Contact</h2>
+                <p>Phone: (123) 456-7890</p>
+                <p>Email: rizalianmedhealth@jru.edu</p>
+            </div>
+
+            <div class="info-box">
+                <h2>Clinic Hours</h2>
+                <p>Monday - Friday: 8:00 AM - 5:00 PM</p>
+                <p>Location: 1st Floor, Building C</p>
+            </div>
+        </div>
+
+
+        <div class="map-section">
+    <h2>Our Location</h2>
+    <div class="map-container">
+        <iframe 
+            src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3861.114928410492!2d121.02598437492375!3d14.59252638589293!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3397c9cdec00e801%3A0x90ebd52dbd050466!2sJos%C3%A9%20Rizal%20University!5e0!3m2!1sen!2sph!4v1743410469524!5m2!1sen!2sph" 
+            width="100%"
+            height="450" 
+            style="border:0;" 
+            allowfullscreen="" 
+            loading="lazy" 
+            referrerpolicy="no-referrer-when-downgrade">
+        </iframe>
+    </div>
+</div>
+
+        <div class="contact-form">
+            <h2>Send us a Message</h2>
+            <form>
+                <div class="form-group">
+                    <label for="name">Full Name:</label>
+                    <input type="text" id="name" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="studentId">Student ID:</label>
+                    <input type="text" id="studentId" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="email">Email:</label>
+                    <input type="email" id="email" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="message">Message:</label>
+                    <textarea id="message" rows="5" required></textarea>
+                </div>
+
+                <button type="submit">Send Message</button>
+            </form>
+        
+            
+            <footer>
+                <div class="button-container">
+                    <a href="/" class="back-btn">Back to Home</a>
+                <p>&copy; 2025 RizalianMedHealth. All rights reserved.</p>
+            </footer>
+        </body>
+        </html>
