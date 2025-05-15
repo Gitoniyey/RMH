@@ -127,6 +127,16 @@ def delete_appointment(appointment_id):
     
     return jsonify({"success": True})
 
+@app.route("/api/admin/appointments/<appointment_id>", methods=["GET"])
+def get_appointment(appointment_id):
+    # Get specific appointment for admin view
+    response = supabase.table("appointments").select("*").eq("appointment_id", appointment_id).execute()
+    
+    if not response.data:
+        return jsonify({"success": False, "error": "Appointment not found"}), 404
+        
+    return jsonify({"success": True, "appointment": response.data[0]})
+
 @app.route("/api/admin/appointments/<appointment_id>/status", methods=["POST"])
 def update_appointment_status(appointment_id):
     data = request.json

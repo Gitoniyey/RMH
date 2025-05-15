@@ -487,6 +487,14 @@ document.addEventListener('DOMContentLoaded', function() {
         return timeStr;
     }
     
+    // Make these functions available to other scopes
+    window.loadRecentAppointments = loadRecentAppointments;
+    window.loadAllAppointments = loadAllAppointments;
+    window.loadAdminNotifications = loadAdminNotifications;
+    window.markAllAdminNotificationsAsRead = markAllAdminNotificationsAsRead;
+    window.formatDate = formatDate;
+    window.formatTime = formatTime;
+    
     // Add these to initialize your admin dashboard
     fetchAdminNotifications();
     fetchAllAppointments();
@@ -496,10 +504,10 @@ document.addEventListener('DOMContentLoaded', function() {
     setInterval(fetchAllAppointments, 30000); // Check every 30 seconds
 });
 
-// These functions need to be global for onclick handlers
+// --- GLOBAL FUNCTIONS FOR ONCLICK HANDLERS ---
+
+// Make viewAppointment available globally
 window.viewAppointment = function(appointmentId) {
-    console.log("Viewing appointment:", appointmentId);
-    
     const appointments = JSON.parse(localStorage.getItem('appointments')) || [];
     const appointment = appointments.find(app => app.id === appointmentId);
     
@@ -510,17 +518,32 @@ window.viewAppointment = function(appointmentId) {
     
     // Mark as read
     appointment.read = true;
-    localStorage.setItem('appointments', JSON.stringify(appointments));
+    
+    // Update in localStorage
+    const updatedAppointments = appointments.map(app => {
+        if (app.id === appointmentId) {
+            app.read = true;
+        }
+        return app;
+    });
+    localStorage.setItem('appointments', JSON.stringify(updatedAppointments));
     
     // Update notification count
     const notificationCount = document.getElementById('notification-count');
-    const unreadCount = appointments.filter(app => !app.read).length;
-    notificationCount.textContent = unreadCount;
-    notificationCount.style.display = unreadCount > 0 ? 'inline-block' : 'none';
+    if (notificationCount) {
+        const unreadCount = updatedAppointments.filter(app => !app.read).length;
+        notificationCount.textContent = unreadCount > 0 ? unreadCount : '';
+        notificationCount.style.display = unreadCount > 0 ? 'inline-block' : 'none';
+    }
     
     // Display in modal
     const modal = document.getElementById('appointment-modal');
     const modalContent = document.querySelector('.modal-content');
+    
+    if (!modal || !modalContent) {
+        console.error("Modal elements not found");
+        return;
+    }
     
     modalContent.innerHTML = `
         <span class="close-modal">&times;</span>
@@ -540,7 +563,7 @@ window.viewAppointment = function(appointmentId) {
             </div>
             <div class="detail-row">
                 <span class="detail-label">Student Name:</span>
-                <span class="detail-value">${appointment.studentName}</span>
+                <span class="detail-value">${appointment.studentName || 'N/A'}</span>
             </div>
             <div class="detail-row">
                 <span class="detail-label">Type:</span>
@@ -567,15 +590,15 @@ window.viewAppointment = function(appointmentId) {
     modal.style.display = 'block';
     
     // Re-attach close event
-    const closeModal = document.querySelector('.close-modal');
-    if (closeModal) {
-        closeModal.addEventListener('click', function() {
+    const closeModalBtn = document.querySelector('.close-modal');
+    if (closeModalBtn) {
+        closeModalBtn.addEventListener('click', function() {
             modal.style.display = 'none';
         });
     }
 };
 
-// ADD THESE NEW FUNCTIONS for appointment status updates
+// Functions for appointment status updates
 window.approveAppointment = function(appointmentId) {
     updateAppointmentStatus(appointmentId, "approved");
 };
@@ -606,14 +629,15 @@ function updateAppointmentStatus(appointmentId, status) {
             localStorage.setItem('appointments', JSON.stringify(updatedAppointments));
             
             // Refresh the appointments display
-            const recentAppointments = document.getElementById('recent-appointments');
-            const allAppointments = document.getElementById('all-appointments');
+            if (typeof loadRecentAppointments === 'function') {
+                loadRecentAppointments();
+            }
             
-            if (recentAppointments) {
-                const loadRecentAppointmentsFunc = window.loadRecentAppointments || function() {
-                    location.reload();
-                };
-                loadRecentAppointmentsFunc();
+            if (typeof loadAllAppointments === 'function') {
+                const statusFilter = document.getElementById('status-filter');
+                if (statusFilter) {
+                    loadAllAppointments(statusFilter.value);
+                }
             }
             
             // Hide the modal if it's open
@@ -634,7 +658,7 @@ function updateAppointmentStatus(appointmentId, status) {
     });
 }
 
-// These functions might already exist, but add them if not
+// Other global functions
 window.viewStudent = function(studentId) {
     console.log("Viewing student:", studentId);
     alert("Student details would be shown here.");
@@ -647,7 +671,6 @@ window.viewRelatedAppointment = function(appointmentId, event) {
     viewAppointment(appointmentId);
 };
 
-// Make this a global function if not already
 window.markAdminNotificationAsRead = function(notificationId) {
     // Update UI first
     const notificationItem = document.querySelector(`.notification-item[onclick*="${notificationId}"]`);
