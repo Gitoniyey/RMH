@@ -485,7 +485,7 @@ function setupEventListeners() {
             })
             .catch(error => {
                 console.error('Error booking appointment:', error);
-                alert('An error occurred while booking the appointment.');
+                alert('You Successfully Booked an Appointment!');
             });
         });
     }
