@@ -81,7 +81,8 @@ def create_appointment():
             "student_id": student_id,
             "message": f"You have booked a new {appointment_type} appointment on {appointment_date} at {appointment_time}.",
             "type": "new_appointment",
-            "related_appointment_id": response.data[0]["appointment_id"]
+            "related_appointment_id": response.data[0]["appointment_id"],
+            "read_status": False
         }
         
         supabase.table("notifications").insert(notification).execute()
@@ -118,12 +119,43 @@ def delete_appointment(appointment_id):
     notification = {
         "student_id": student_id,
         "message": "An appointment has been cancelled.",
-        "type": "cancelled_appointment"
+        "type": "cancelled_appointment",
+        "read_status": False
     }
     
     supabase.table("notifications").insert(notification).execute()
     
     return jsonify({"success": True})
+
+@app.route("/api/admin/appointments/<appointment_id>/status", methods=["POST"])
+def update_appointment_status(appointment_id):
+    data = request.json
+    new_status = data.get("status")  # "approved" or "rejected"
+    
+    # Update appointment status
+    response = supabase.table("appointments").update({"status": new_status}).eq("appointment_id", appointment_id).execute()
+    
+    if not response.data:
+        return jsonify({"success": False, "error": "Appointment not found"}), 404
+    
+    # Get the student_id from the appointment
+    student_id = response.data[0]["student_id"]
+    appointment_type = response.data[0]["appointment_type"]
+    appointment_date = response.data[0]["appointment_date"]
+    appointment_time = response.data[0]["appointment_time"]
+    
+    # Create notification for student about status change
+    student_notification = {
+        "student_id": student_id,
+        "message": f"Your {appointment_type} appointment on {appointment_date} at {appointment_time} has been {new_status}.",
+        "type": "appointment_status",
+        "related_appointment_id": appointment_id,
+        "read_status": False
+    }
+    
+    supabase.table("notifications").insert(student_notification).execute()
+    
+    return jsonify({"success": True, "appointment": response.data[0]})
 
 @app.route("/api/notifications", methods=["GET"])
 def get_notifications():
@@ -162,12 +194,32 @@ def mark_notifications_read():
     
     return jsonify({"success": True})
 
+@app.route("/api/admin/notifications/mark-read", methods=["POST"])
+def mark_admin_notifications_read():
+    notification_ids = request.json.get("notification_ids", [])
+    
+    if notification_ids:
+        # Mark specific admin notifications as read
+        response = supabase.table("notifications").update({"read_status": True}).in_("notification_id", notification_ids).eq("student_id", 0).execute()
+    else:
+        # Mark all admin notifications as read
+        response = supabase.table("notifications").update({"read_status": True}).eq("student_id", 0).execute()
+    
+    return jsonify({"success": True})
+
 @app.route("/api/notifications/clear", methods=["DELETE"])
 def clear_notifications():
     student_id = session.get("student_id")
     
     # Delete all notifications for the student
     supabase.table("notifications").delete().eq("student_id", student_id).execute()
+    
+    return jsonify({"success": True})
+
+@app.route("/api/admin/notifications/clear", methods=["DELETE"])
+def clear_admin_notifications():
+    # Delete all notifications for the admin
+    supabase.table("notifications").delete().eq("student_id", 0).execute()
     
     return jsonify({"success": True})
 

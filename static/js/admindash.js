@@ -50,8 +50,24 @@ document.addEventListener('DOMContentLoaded', function() {
         fetch('/api/admin/notifications')
             .then(response => response.json())
             .then(data => {
-                // Store notifications in localStorage
-                localStorage.setItem('adminNotifications', JSON.stringify(data));
+                // Get existing notifications
+                const existingNotifications = JSON.parse(localStorage.getItem('adminNotifications')) || [];
+                
+                // Merge with new data, avoiding duplicates
+                const combinedNotifications = [...existingNotifications];
+                
+                // Add new notifications that don't already exist
+                data.forEach(newNotification => {
+                    const exists = combinedNotifications.some(
+                        existing => existing.notification_id === newNotification.notification_id
+                    );
+                    if (!exists) {
+                        combinedNotifications.push(newNotification);
+                    }
+                });
+                
+                // Store merged notifications
+                localStorage.setItem('adminNotifications', JSON.stringify(combinedNotifications));
                 
                 // Update the UI
                 if (typeof loadAdminNotifications === 'function') {
@@ -502,7 +518,7 @@ window.viewAppointment = function(appointmentId) {
     notificationCount.textContent = unreadCount;
     notificationCount.style.display = unreadCount > 0 ? 'inline-block' : 'none';
     
-    // Show appointment details in modal
+    // Display in modal
     const modal = document.getElementById('appointment-modal');
     const modalContent = document.querySelector('.modal-content');
     
@@ -510,202 +526,135 @@ window.viewAppointment = function(appointmentId) {
         <span class="close-modal">&times;</span>
         <h2>Appointment Details</h2>
         <div class="appointment-details">
-            <p><strong>Date:</strong> ${formatDate(appointment.date)}</p>
-            <p><strong>Time:</strong> ${formatTime(appointment.time)}</p>
-            <p><strong>Student ID:</strong> ${appointment.studentId}</p>
-            <p><strong>Student Name:</strong> ${appointment.studentName}</p>
-            <p><strong>Type:</strong> ${appointment.type}</p>
-            <p><strong>Status:</strong> <span class="status-${appointment.status}">${appointment.status}</span></p>
-            <p><strong>Reason/Symptoms:</strong> ${appointment.reason || 'N/A'}</p>
+            <div class="detail-row">
+                <span class="detail-label">Date:</span>
+                <span class="detail-value">${formatDate(appointment.date)}</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Time:</span>
+                <span class="detail-value">${formatTime(appointment.time)}</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Student ID:</span>
+                <span class="detail-value">${appointment.studentId}</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Student Name:</span>
+                <span class="detail-value">${appointment.studentName}</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Type:</span>
+                <span class="detail-value">${appointment.type}</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Status:</span>
+                <span class="detail-value status-${appointment.status}">${appointment.status}</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Reason:</span>
+                <span class="detail-value">${appointment.reason || 'Not provided'}</span>
+            </div>
         </div>
-        ${appointment.status === 'pending' ? `
         <div class="modal-actions">
-            <button onclick="approveAppointment(${appointmentId})" class="approve-btn">Approve</button>
-            <button onclick="rejectAppointment(${appointmentId})" class="reject-btn">Reject</button>
-        </div>` : ''}
+            ${appointment.status === 'pending' ? `
+            <button onclick="approveAppointment(${appointment.id})" class="approve-btn">Approve</button>
+            <button onclick="rejectAppointment(${appointment.id})" class="reject-btn">Reject</button>
+            ` : ''}
+            <button onclick="document.getElementById('appointment-modal').style.display='none'" class="close-btn">Close</button>
+        </div>
     `;
     
     modal.style.display = 'block';
     
-    // Close modal when clicking on X
-    document.querySelector('.close-modal').addEventListener('click', function() {
-        modal.style.display = 'none';
-    });
+    // Re-attach close event
+    const closeModal = document.querySelector('.close-modal');
+    if (closeModal) {
+        closeModal.addEventListener('click', function() {
+            modal.style.display = 'none';
+        });
+    }
 };
 
+// ADD THESE NEW FUNCTIONS for appointment status updates
 window.approveAppointment = function(appointmentId) {
-    console.log("Approving appointment:", appointmentId);
-    
-    const appointments = JSON.parse(localStorage.getItem('appointments')) || [];
-    const appointmentIndex = appointments.findIndex(app => app.id === appointmentId);
-    
-    if (appointmentIndex === -1) {
-        alert("Appointment not found");
-        return;
-    }
-    
-    // Update status
-    appointments[appointmentIndex].status = 'approved';
-    appointments[appointmentIndex].read = true;
-    localStorage.setItem('appointments', JSON.stringify(appointments));
-    
-    // In a real app, this would call an API to update the database
-    
-    // Create a notification
-    const adminNotifications = JSON.parse(localStorage.getItem('adminNotifications')) || [];
-    adminNotifications.push({
-        id: Date.now(),
-        type: 'appointment_status',
-        message: `Appointment with ${appointments[appointmentIndex].studentName} on ${formatDate(appointments[appointmentIndex].date)} at ${formatTime(appointments[appointmentIndex].time)} has been approved.`,
-        timestamp: new Date().toISOString(),
-        read: true
-    });
-    localStorage.setItem('adminNotifications', JSON.stringify(adminNotifications));
-    
-    // Update UI
-    alert("Appointment approved successfully");
-    
-    // Close modal if open
-    const modal = document.getElementById('appointment-modal');
-    if (modal && modal.style.display === 'block') {
-        modal.style.display = 'none';
-    }
-    
-    // Refresh appointments list
-    const recentAppointments = document.getElementById('recent-appointments');
-    const allAppointments = document.getElementById('all-appointments');
-    
-    if (document.getElementById('section-dashboard').classList.contains('active')) {
-        loadRecentAppointments();
-    } else if (document.getElementById('section-appointments').classList.contains('active')) {
-        loadAllAppointments(document.getElementById('status-filter').value);
-    }
+    updateAppointmentStatus(appointmentId, "approved");
 };
 
 window.rejectAppointment = function(appointmentId) {
-    console.log("Rejecting appointment:", appointmentId);
-    
-    const appointments = JSON.parse(localStorage.getItem('appointments')) || [];
-    const appointmentIndex = appointments.findIndex(app => app.id === appointmentId);
-    
-    if (appointmentIndex === -1) {
-        alert("Appointment not found");
-        return;
-    }
-    
-    // Update status
-    appointments[appointmentIndex].status = 'rejected';
-    appointments[appointmentIndex].read = true;
-    localStorage.setItem('appointments', JSON.stringify(appointments));
-    
-    // In a real app, this would call an API to update the database
-    
-    // Create a notification
-    const adminNotifications = JSON.parse(localStorage.getItem('adminNotifications')) || [];
-    adminNotifications.push({
-        id: Date.now(),
-        type: 'appointment_status',
-        message: `Appointment with ${appointments[appointmentIndex].studentName} on ${formatDate(appointments[appointmentIndex].date)} at ${formatTime(appointments[appointmentIndex].time)} has been rejected.`,
-        timestamp: new Date().toISOString(),
-        read: true
-    });
-    localStorage.setItem('adminNotifications', JSON.stringify(adminNotifications));
-    
-    // Update UI
-    alert("Appointment rejected successfully");
-    
-    // Close modal if open
-    const modal = document.getElementById('appointment-modal');
-    if (modal && modal.style.display === 'block') {
-        modal.style.display = 'none';
-    }
-    
-    // Refresh appointments list
-    if (document.getElementById('section-dashboard').classList.contains('active')) {
-        loadRecentAppointments();
-    } else if (document.getElementById('section-appointments').classList.contains('active')) {
-        loadAllAppointments(document.getElementById('status-filter').value);
-    }
+    updateAppointmentStatus(appointmentId, "rejected");
 };
 
+function updateAppointmentStatus(appointmentId, status) {
+    fetch(`/api/admin/appointments/${appointmentId}/status`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ status: status })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Update the appointment in localStorage
+            const appointments = JSON.parse(localStorage.getItem('appointments')) || [];
+            const updatedAppointments = appointments.map(app => {
+                if (app.id === appointmentId) {
+                    app.status = status;
+                }
+                return app;
+            });
+            localStorage.setItem('appointments', JSON.stringify(updatedAppointments));
+            
+            // Refresh the appointments display
+            const recentAppointments = document.getElementById('recent-appointments');
+            const allAppointments = document.getElementById('all-appointments');
+            
+            if (recentAppointments) {
+                const loadRecentAppointmentsFunc = window.loadRecentAppointments || function() {
+                    location.reload();
+                };
+                loadRecentAppointmentsFunc();
+            }
+            
+            // Hide the modal if it's open
+            const modal = document.getElementById('appointment-modal');
+            if (modal) {
+                modal.style.display = 'none';
+            }
+            
+            // Show success feedback
+            alert(`Appointment ${status} successfully.`);
+        } else {
+            alert("Failed to update appointment status. Please try again.");
+        }
+    })
+    .catch(error => {
+        console.error('Error updating appointment status:', error);
+        alert("An error occurred while updating the appointment status.");
+    });
+}
+
+// These functions might already exist, but add them if not
 window.viewStudent = function(studentId) {
     console.log("Viewing student:", studentId);
-    
-    const appointments = JSON.parse(localStorage.getItem('appointments')) || [];
-    const studentAppointments = appointments.filter(app => app.studentId === studentId);
-    
-    if (studentAppointments.length === 0) {
-        alert("No appointments found for this student");
-        return;
-    }
-    
-    const student = {
-        id: studentId,
-        name: studentAppointments[0].studentName || `Student ${studentId}`,
-        appointments: studentAppointments
-    };
-    
-    // Show student details in modal
-    const modal = document.getElementById('appointment-modal');
-    const modalContent = document.querySelector('.modal-content');
-    
-    modalContent.innerHTML = `
-        <span class="close-modal">&times;</span>
-        <h2>Student Details</h2>
-        <div class="student-details">
-            <p><strong>Student ID:</strong> ${student.id}</p>
-            <p><strong>Student Name:</strong> ${student.name}</p>
-            <p><strong>Total Appointments:</strong> ${student.appointments.length}</p>
-        </div>
-        <h3>Appointment History</h3>
-        <table class="appointments-table">
-            <thead>
-                <tr>
-                    <th>Date</th>
-                    <th>Time</th>
-                    <th>Type</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${student.appointments.map(app => `
-                    <tr>
-                        <td>${formatDate(app.date)}</td>
-                        <td>${formatTime(app.time)}</td>
-                        <td>${app.type}</td>
-                        <td class="status-${app.status}">${app.status}</td>
-                        <td>
-                            <button onclick="viewAppointment(${app.id})" class="view-btn">View</button>
-                        </td>
-                    </tr>
-                `).join('')}
-            </tbody>
-        </table>
-    `;
-    
-    modal.style.display = 'block';
-    
-    // Close modal when clicking on X
-    document.querySelector('.close-modal').addEventListener('click', function() {
-        modal.style.display = 'none';
-    });
+    alert("Student details would be shown here.");
 };
 
-window.markAdminNotificationAsRead = function(notificationId) {
-    console.log("Marking notification as read:", notificationId);
-    
-    const adminNotifications = JSON.parse(localStorage.getItem('adminNotifications')) || [];
-    const notificationIndex = adminNotifications.findIndex(note => note.notification_id === notificationId);
-    
-    if (notificationIndex === -1) {
-        console.error("Notification not found:", notificationId);
-        return;
+window.viewRelatedAppointment = function(appointmentId, event) {
+    if (event) {
+        event.stopPropagation();
     }
-    
-    // Update read status
-    adminNotifications[notificationIndex].read_status = true;
-    localStorage.setItem('adminNotifications', JSON.stringify(adminNotifications));
+    viewAppointment(appointmentId);
+};
+
+// Make this a global function if not already
+window.markAdminNotificationAsRead = function(notificationId) {
+    // Update UI first
+    const notificationItem = document.querySelector(`.notification-item[onclick*="${notificationId}"]`);
+    if (notificationItem) {
+        notificationItem.classList.remove('unread');
+        notificationItem.classList.add('read');
+    }
     
     // Update in database
     fetch('/api/admin/notifications/mark-read', {
@@ -717,79 +666,35 @@ window.markAdminNotificationAsRead = function(notificationId) {
             notification_ids: [notificationId]
         })
     })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Update local storage
+            const adminNotifications = JSON.parse(localStorage.getItem('adminNotifications')) || [];
+            const updatedNotifications = adminNotifications.map(notification => {
+                if (notification.notification_id === notificationId) {
+                    notification.read_status = true;
+                }
+                return notification;
+            });
+            localStorage.setItem('adminNotifications', JSON.stringify(updatedNotifications));
+            
+            // Update notification count
+            const notificationCount = document.getElementById('notification-count');
+            if (notificationCount) {
+                const adminNotifications = JSON.parse(localStorage.getItem('adminNotifications')) || [];
+                const appointments = JSON.parse(localStorage.getItem('appointments')) || [];
+                
+                const unreadAppointments = appointments.filter(app => !app.read).length;
+                const unreadNotifications = adminNotifications.filter(note => !note.read_status).length;
+                const totalUnread = unreadAppointments + unreadNotifications;
+                
+                notificationCount.textContent = totalUnread;
+                notificationCount.style.display = totalUnread > 0 ? 'inline-block' : 'none';
+            }
+        }
+    })
     .catch(error => {
         console.error('Error marking notification as read:', error);
     });
-    
-    // Update UI
-    const notificationElement = document.querySelector(`.notification-item[onclick*="${notificationId}"]`);
-    if (notificationElement) {
-        notificationElement.classList.remove('unread');
-        notificationElement.classList.add('read');
-    }
-    
-    // Update notification count
-    checkNotifications();
 };
-
-window.viewRelatedAppointment = function(appointmentId, event) {
-    // Prevent the parent notification click event
-    if (event) {
-        event.stopPropagation();
-    }
-    
-    viewAppointment(appointmentId);
-};
-
-// Helper functions
-function formatDate(dateStr) {
-    if (!dateStr) return 'N/A';
-    
-    const date = new Date(dateStr);
-    if (isNaN(date.getTime())) return dateStr;
-    
-    return date.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-    });
-}
-
-function formatTime(timeStr) {
-    if (!timeStr) return 'N/A';
-    
-    // Handle cases where timeStr is already in HH:MM format
-    if (timeStr.includes(':')) {
-        const [hours, minutes] = timeStr.split(':').map(Number);
-        const period = hours >= 12 ? 'PM' : 'AM';
-        const formattedHours = hours % 12 || 12;
-        return `${formattedHours}:${minutes.toString().padStart(2, '0')} ${period}`;
-    }
-    
-    // Handle cases where timeStr is a timestamp
-    const date = new Date(timeStr);
-    if (!isNaN(date.getTime())) {
-        return date.toLocaleTimeString('en-US', {
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-    }
-    
-    return timeStr;
-}
-
-function checkNotifications() {
-    const appointments = JSON.parse(localStorage.getItem('appointments')) || [];
-    const adminNotifications = JSON.parse(localStorage.getItem('adminNotifications')) || [];
-    
-    // Count unread items from both sources
-    const unreadAppointments = appointments.filter(app => !app.read).length;
-    const unreadNotifications = adminNotifications.filter(note => !note.read_status).length;
-    const totalUnread = unreadAppointments + unreadNotifications;
-    
-    const notificationCount = document.getElementById('notification-count');
-    if (notificationCount) {
-        notificationCount.textContent = totalUnread;
-        notificationCount.style.display = totalUnread > 0 ? 'inline-block' : 'none';
-    }
-}
