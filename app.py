@@ -49,7 +49,7 @@ def get_appointments():
     student_id = session.get("student_id")
     
     # Get all appointments for the student
-    response = supabase.table("appointments2").select("*").eq("student_id", student_id).execute()
+    response = supabase.table("appointments").select("*").eq("student_id", student_id).execute()
     
     return jsonify(response.data)
 
@@ -73,7 +73,7 @@ def create_appointment():
         "status": "pending"
     }
     
-    response = supabase.table("appointments2").insert(new_appointment).execute()
+    response = supabase.table("appointments").insert(new_appointment).execute()
     
     if response.data:
         # Create notification for new appointment
@@ -84,7 +84,7 @@ def create_appointment():
             "related_appointment_id": response.data[0]["appointment_id"]
         }
         
-        supabase.table("notifications2").insert(notification).execute()
+        supabase.table("notifications").insert(notification).execute()
         
         return jsonify({"success": True, "appointment": response.data[0]})
     
@@ -95,13 +95,13 @@ def delete_appointment(appointment_id):
     student_id = session.get("student_id")
     
     # Verify appointment belongs to student
-    response = supabase.table("appointments2").select("*").eq("appointment_id", appointment_id).eq("student_id", student_id).execute()
+    response = supabase.table("appointments").select("*").eq("appointment_id", appointment_id).eq("student_id", student_id).execute()
     
     if not response.data:
         return jsonify({"success": False, "error": "Appointment not found or unauthorized"}), 404
     
     # Delete appointment
-    supabase.table("appointments2").delete().eq("appointment_id", appointment_id).execute()
+    supabase.table("appointments").delete().eq("appointment_id", appointment_id).execute()
     
     # Create notification for deleted appointment
     notification = {
@@ -110,7 +110,7 @@ def delete_appointment(appointment_id):
         "type": "cancelled_appointment"
     }
     
-    supabase.table("notifications2").insert(notification).execute()
+    supabase.table("notifications").insert(notification).execute()
     
     return jsonify({"success": True})
 
@@ -119,7 +119,7 @@ def get_notifications():
     student_id = session.get("student_id")
     
     # Get all notifications for the student
-    response = supabase.table("notifications2").select("*").eq("student_id", student_id).execute()
+    response = supabase.table("notifications").select("*").eq("student_id", student_id).execute()
     
     return jsonify(response.data)
 
@@ -130,10 +130,10 @@ def mark_notifications_read():
     
     if notification_ids:
         # Mark specific notifications as read
-        response = supabase.table("notifications2").update({"read_status": True}).in_("notification_id", notification_ids).eq("student_id", student_id).execute()
+        response = supabase.table("notifications").update({"read_status": True}).in_("notification_id", notification_ids).eq("student_id", student_id).execute()
     else:
         # Mark all notifications as read
-        response = supabase.table("notifications2").update({"read_status": True}).eq("student_id", student_id).execute()
+        response = supabase.table("notifications").update({"read_status": True}).eq("student_id", student_id).execute()
     
     return jsonify({"success": True})
 
@@ -142,7 +142,7 @@ def clear_notifications():
     student_id = session.get("student_id")
     
     # Delete all notifications for the student
-    supabase.table("notifications2").delete().eq("student_id", student_id).execute()
+    supabase.table("notifications").delete().eq("student_id", student_id).execute()
     
     return jsonify({"success": True})
 
@@ -186,7 +186,7 @@ def book_appointment():
     appointment_date = request.form.get('appointment_date')
     reason = request.form.get('reason')
 
-    response = supabase.table("appointments2").insert([{
+    response = supabase.table("appointments").insert([{
         "student_name": student_name,
         "student_id": student_id,
         "course": course,
