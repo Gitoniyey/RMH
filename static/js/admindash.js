@@ -11,6 +11,59 @@ document.addEventListener('DOMContentLoaded', function() {
     const closeModal = document.querySelector('.close-modal');
     const studentSearch = document.getElementById('student-search');
     
+    // Function to fetch all appointments from the database
+    function fetchAllAppointments() {
+        fetch('/api/admin/appointments')
+            .then(response => response.json())
+            .then(data => {
+                // Process appointment data for admin dashboard
+                const formattedAppointments = data.map(app => ({
+                    id: app.appointment_id,
+                    date: app.appointment_date,
+                    time: app.appointment_time,
+                    studentId: app.student_id,
+                    studentName: app.student_name || `Student ${app.student_id}`,
+                    type: app.appointment_type,
+                    status: app.status,
+                    reason: app.symptoms_reason,
+                    timestamp: app.created_at,
+                    read: false
+                }));
+                
+                // Update localStorage with the latest appointments
+                localStorage.setItem('appointments', JSON.stringify(formattedAppointments));
+                
+                // Update the UI
+                loadRecentAppointments();
+                if (typeof loadAllAppointments === 'function' && statusFilter) {
+                    loadAllAppointments(statusFilter.value);
+                }
+                updateDashboardStats();
+            })
+            .catch(error => {
+                console.error('Error fetching appointments:', error);
+            });
+    }
+
+    // Function to fetch admin notifications
+    function fetchAdminNotifications() {
+        fetch('/api/admin/notifications')
+            .then(response => response.json())
+            .then(data => {
+                // Store notifications in localStorage
+                localStorage.setItem('adminNotifications', JSON.stringify(data));
+                
+                // Update the UI
+                if (typeof loadAdminNotifications === 'function') {
+                    loadAdminNotifications();
+                }
+                checkNotifications();
+            })
+            .catch(error => {
+                console.error('Error fetching admin notifications:', error);
+            });
+    }
+    
     // Navigation between sections
     menuLinks.forEach(link => {
         if (link.textContent.includes('Logout')) return;
@@ -104,7 +157,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Count unread items from both sources
         const unreadAppointments = appointments.filter(app => !app.read).length;
-        const unreadNotifications = adminNotifications.filter(note => !note.read).length;
+        const unreadNotifications = adminNotifications.filter(note => !note.read_status).length;
         const totalUnread = unreadAppointments + unreadNotifications;
         
         notificationCount.textContent = totalUnread;
@@ -271,18 +324,18 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         // Sort by timestamp (newest first)
-        const sorted = [...adminNotifications].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        const sorted = [...adminNotifications].sort((a, b) => new Date(b.created_at || b.timestamp) - new Date(a.created_at || a.timestamp));
         
         container.innerHTML = sorted.map((notification) => `
-            <div class="notification-item ${notification.read ? '' : 'unread'}" 
-                 onclick="markAdminNotificationAsRead(${notification.id})">
+            <div class="notification-item ${notification.read_status ? '' : 'unread'}" 
+                 onclick="markAdminNotificationAsRead(${notification.notification_id})">
                 <div class="notification-header">
                     <span class="notification-type">${notification.type ? notification.type.replace(/_/g, ' ') : 'notification'}</span>
-                    <span class="notification-time">${formatDate(notification.timestamp)}</span>
+                    <span class="notification-time">${formatDate(notification.created_at || notification.timestamp)}</span>
                 </div>
                 <p>${notification.message}</p>
-                ${notification.appointmentId ? `
-                    <button class="view-related-btn" onclick="viewRelatedAppointment(${notification.appointmentId}, event)">
+                ${notification.related_appointment_id ? `
+                    <button class="view-related-btn" onclick="viewRelatedAppointment(${notification.related_appointment_id}, event)">
                         View Related Appointment
                     </button>` : ''}
             </div>
@@ -293,17 +346,45 @@ document.addEventListener('DOMContentLoaded', function() {
     function markAllAdminNotificationsAsRead() {
         const adminNotifications = JSON.parse(localStorage.getItem('adminNotifications')) || [];
         
-        const updated = adminNotifications.map(notification => ({
-            ...notification,
-            read: true
-        }));
+        if (adminNotifications.length === 0) return;
+        
+        // Mark all as read in the UI
+        document.querySelectorAll('#admin-notifications-list .notification-item').forEach(item => {
+            item.classList.remove('unread');
+            item.classList.add('read');
+        });
+        
+        // Update localStorage
+        const updated = adminNotifications.map(notification => {
+            notification.read_status = true;
+            return notification;
+        });
         
         localStorage.setItem('adminNotifications', JSON.stringify(updated));
-        checkNotifications();
+        
+        // Update API
+        fetch('/api/admin/notifications/mark-read', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({})
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                checkNotifications();
+            }
+        })
+        .catch(error => {
+            console.error('Error marking all notifications as read:', error);
+        });
     }
     
-    // Load students list
+    // Load students
     function loadStudents() {
+        // This would typically be an API call to get students
+        // For now, we'll just use the appointments data to extract student info
         const appointments = JSON.parse(localStorage.getItem('appointments')) || [];
         
         if (!studentList) {
@@ -313,34 +394,21 @@ document.addEventListener('DOMContentLoaded', function() {
         
         studentList.innerHTML = '';
         
-        console.log("Loading students from appointments:", appointments);
-        
-        // Get unique students
-        const studentMap = {};
+        // Extract unique students from appointments
+        const uniqueStudents = {};
         appointments.forEach(app => {
-            if (app.studentId && app.studentName) {
-                if (!studentMap[app.studentId]) {
-                    studentMap[app.studentId] = {
-                        id: app.studentId,
-                        name: app.studentName,
-                        count: 0,
-                        pending: 0,
-                        approved: 0,
-                        rejected: 0
-                    };
-                }
-                studentMap[app.studentId].count++;
-                
-                // Track status counts
-                if (app.status === 'pending') studentMap[app.studentId].pending++;
-                else if (app.status === 'approved') studentMap[app.studentId].approved++;
-                else if (app.status === 'rejected') studentMap[app.studentId].rejected++;
+            if (app.studentId && !uniqueStudents[app.studentId]) {
+                uniqueStudents[app.studentId] = {
+                    id: app.studentId,
+                    name: app.studentName || `Student ${app.studentId}`,
+                    appointments: 1
+                };
+            } else if (app.studentId) {
+                uniqueStudents[app.studentId].appointments += 1;
             }
         });
         
-        const students = Object.values(studentMap);
-        
-        console.log("Extracted students:", students);
+        const students = Object.values(uniqueStudents);
         
         if (students.length === 0) {
             studentList.innerHTML = '<tr><td colspan="4" class="empty-table">No students found</td></tr>';
@@ -353,276 +421,375 @@ document.addEventListener('DOMContentLoaded', function() {
         students.forEach(student => {
             const row = document.createElement('tr');
             row.innerHTML = `
-                <td>${student.id || 'Unknown ID'}</td>
-                <td>${student.name || 'Unknown Name'}</td>
+                <td>${student.id}</td>
+                <td>${student.name}</td>
+                <td>${student.appointments}</td>
                 <td>
-                    <span title="Pending: ${student.pending}, Approved: ${student.approved}, Rejected: ${student.rejected}">
-                        ${student.count} 
-                        ${student.pending > 0 ? `<span class="status-badge pending">${student.pending}</span>` : ''}
-                    </span>
-                </td>
-                <td>
-                    <button onclick="viewStudentAppointments('${student.id}')" class="view-btn">View Appointments</button>
+                    <button onclick="viewStudent(${student.id})" class="view-btn">View</button>
                 </td>
             `;
+            
             studentList.appendChild(row);
         });
     }
     
-    // Format date
+    // Format date helper function
     function formatDate(dateStr) {
         if (!dateStr) return 'N/A';
         
-        try {
-            const date = new Date(dateStr);
-            return date.toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-            });
-        } catch (e) {
-            console.error("Error formatting date:", e);
-            return dateStr;
-        }
+        const date = new Date(dateStr);
+        if (isNaN(date.getTime())) return dateStr;
+        
+        return date.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+        });
     }
     
-    // Format time
+    // Format time helper function
     function formatTime(timeStr) {
         if (!timeStr) return 'N/A';
         
-        try {
-            const [hours, minutes] = timeStr.split(':');
-            const hour = parseInt(hours);
-            const ampm = hour >= 12 ? 'PM' : 'AM';
-            const formattedHour = hour % 12 || 12;
-            
-            return `${formattedHour}:${minutes || '00'} ${ampm}`;
-        } catch (e) {
-            console.error("Error formatting time:", e);
-            return timeStr;
+        // Handle cases where timeStr is already in HH:MM format
+        if (timeStr.includes(':')) {
+            const [hours, minutes] = timeStr.split(':').map(Number);
+            const period = hours >= 12 ? 'PM' : 'AM';
+            const formattedHours = hours % 12 || 12;
+            return `${formattedHours}:${minutes.toString().padStart(2, '0')} ${period}`;
         }
+        
+        // Handle cases where timeStr is a timestamp
+        const date = new Date(timeStr);
+        if (!isNaN(date.getTime())) {
+            return date.toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+        
+        return timeStr;
     }
     
-    // Initial load
-    checkNotifications();
-    loadRecentAppointments();
-    updateDashboardStats();
-    setInterval(checkNotifications, 5000);
+    // Add these to initialize your admin dashboard
+    fetchAdminNotifications();
+    fetchAllAppointments();
     
-    // Make functions accessible globally
-    window.formatDate = formatDate;
-    window.formatTime = formatTime;
-    window.checkNotifications = checkNotifications;
-    window.loadRecentAppointments = loadRecentAppointments;
-    window.loadAllAppointments = loadAllAppointments;
-    window.updateDashboardStats = updateDashboardStats;
-    window.loadStudents = loadStudents;
-    
-    // Debug function to inspect localStorage
-    window.debugLocalStorage = function() {
-        const appointments = JSON.parse(localStorage.getItem('appointments')) || [];
-        const adminNotifications = JSON.parse(localStorage.getItem('adminNotifications')) || [];
-        const studentNotifications = JSON.parse(localStorage.getItem('studentNotifications')) || [];
-        
-        console.log("Appointments:", appointments);
-        console.log("Admin Notifications:", adminNotifications);
-        console.log("Student Notifications:", studentNotifications);
-        
-        return {
-            appointments,
-            adminNotifications,
-            studentNotifications
-        };
-    };
-    
-    // Add global functions for HTML onclick handlers
-    window.markAdminNotificationAsRead = function(id) {
-        const adminNotifications = JSON.parse(localStorage.getItem('adminNotifications')) || [];
-        
-        const updated = adminNotifications.map(notification => {
-            if (notification.id === id) {
-                return { ...notification, read: true };
-            }
-            return notification;
-        });
-        
-        localStorage.setItem('adminNotifications', JSON.stringify(updated));
-        loadAdminNotifications();
-        checkNotifications();
-    };
-    
-    window.viewRelatedAppointment = function(appointmentId, event) {
-        if (event) event.stopPropagation(); // Prevent notification click event
-        viewAppointment(appointmentId);
-    };
-    
-    window.viewAppointment = function(id) {
-        const appointments = JSON.parse(localStorage.getItem('appointments')) || [];
-        const app = appointments.find(a => a.id === id);
-        
-        if (!app) {
-            alert('Appointment not found');
-            return;
-        }
-        
-        // Mark as read
-        markAsRead(id);
-        
-        // Fill modal
-        document.getElementById('modal-student-name').textContent = app.studentName || 'N/A';
-        document.getElementById('modal-student-id').textContent = app.studentId || 'N/A';
-        document.getElementById('modal-date').textContent = formatDate(app.date);
-        document.getElementById('modal-time').textContent = formatTime(app.time);
-        document.getElementById('modal-type').textContent = app.type || 'N/A';
-        document.getElementById('modal-symptoms').textContent = app.symptoms || '';
-        document.getElementById('modal-status').textContent = app.status || 'pending';
-        
-        // Add action buttons if pending
-        const actionsDiv = document.getElementById('modal-actions');
-        actionsDiv.innerHTML = '';
-        
-        if (app.status === 'pending') {
-            actionsDiv.innerHTML = `
-                <button onclick="approveAppointment(${app.id})" class="approve-btn">Approve</button>
-                <button onclick="rejectAppointment(${app.id})" class="reject-btn">Reject</button>
-            `;
-        }
-        
-        // Show modal
-        document.getElementById('appointment-modal').style.display = 'block';
-    };
-    
-    window.viewStudentAppointments = function(studentId) {
-        const appointments = JSON.parse(localStorage.getItem('appointments')) || [];
-        const studentApps = appointments.filter(app => app.studentId === studentId);
-        
-        if (studentApps.length === 0) {
-            alert('No appointments found for this student');
-            return;
-        }
-        
-        // Switch to appointments section and filter by this student
-        document.querySelector('a[href="#appointments"]').click();
-        
-        // Custom filtering (not by status, but by student)
-        const allAppointments = document.getElementById('all-appointments');
-        allAppointments.innerHTML = '';
-        
-        // Sort by date (newest first)
-        const sorted = [...studentApps].sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
-        
-        sorted.forEach(app => {
-            const row = document.createElement('tr');
-            row.className = app.read ? '' : 'unread-row';
-            
-            // Ensure we always have all fields for display
-            const safeApp = {
-                id: app.id || Date.now(),
-                date: app.date || '',
-                time: app.time || '',
-                studentId: app.studentId || 'N/A',
-                studentName: app.studentName || 'N/A',
-                type: app.type || 'N/A',
-                status: app.status || 'pending',
-                read: app.read || false
-            };
-            
-            row.innerHTML = `
-                <td>${formatDate(safeApp.date)}</td>
-                <td>${formatTime(safeApp.time)}</td>
-                <td>${safeApp.studentId}</td>
-                <td>${safeApp.studentName}</td>
-                <td>${safeApp.type}</td>
-                <td class="status-${safeApp.status}">${safeApp.status}</td>
-                <td>
-                    <button onclick="viewAppointment(${safeApp.id})" class="view-btn">View</button>
-                    ${safeApp.status === 'pending' ? `
-                    <button onclick="approveAppointment(${safeApp.id})" class="approve-btn">Approve</button>
-                    <button onclick="rejectAppointment(${safeApp.id})" class="reject-btn">Reject</button>
-                    ` : ''}
-                </td>
-            `;
-            
-            allAppointments.appendChild(row);
-        });
-    };
-    
-    window.markAsRead = function(id) {
-        const appointments = JSON.parse(localStorage.getItem('appointments')) || [];
-        
-        const updated = appointments.map(app => {
-            if (app.id === id) {
-                return { ...app, read: true };
-            }
-            return app;
-        });
-        
-        localStorage.setItem('appointments', JSON.stringify(updated));
-        refreshAppointments();
-    };
-    
-    window.approveAppointment = function(id) {
-        const reason = prompt('Add any notes for the approval (optional):');
-        updateStatus(id, 'approved', reason || '');
-    };
-    
-    window.rejectAppointment = function(id) {
-        const reason = prompt('Please provide a reason for rejecting:');
-        if (reason) {
-            updateStatus(id, 'rejected', reason);
-        }
-    };
-    
-    window.updateStatus = function(id, status, reason = '') {
-        const appointments = JSON.parse(localStorage.getItem('appointments')) || [];
-        const app = appointments.find(a => a.id === id);
-        
-        if (!app) {
-            alert('Appointment not found');
-            return;
-        }
-        
-        // Update status
-        const updated = appointments.map(a => {
-            if (a.id === id) {
-                return { ...a, status, reason, read: true };
-            }
-            return a;
-        });
-        
-        localStorage.setItem('appointments', JSON.stringify(updated));
-        
-        // Send notification to student
-        const studentNotifications = JSON.parse(localStorage.getItem('studentNotifications')) || [];
-        
-        const notification = {
-            id: Date.now(),
-            type: `appointment_${status}`,
-            appointmentId: id,
-            studentId: app.studentId,
-            studentName: app.studentName,
-            message: `Your appointment on ${formatDate(app.date)} at ${formatTime(app.time)} has been ${status}.${reason ? ` Reason: ${reason}` : ''}`,
-            timestamp: new Date().toISOString(),
-            read: false
-        };
-        
-        studentNotifications.push(notification);
-        localStorage.setItem('studentNotifications', JSON.stringify(studentNotifications));
-        
-        // Refresh appointments
-        refreshAppointments();
-        
-        // Close modal if open
-        document.getElementById('appointment-modal').style.display = 'none';
-        
-        alert(`Appointment has been ${status}`);
-    };
-    
-    window.refreshAppointments = function() {
-        // Refresh all appointment views
-        loadRecentAppointments();
-        loadAllAppointments(document.getElementById('status-filter').value);
-        updateDashboardStats();
-        checkNotifications();
-    };
+    // Set interval to periodically check for new data
+    setInterval(fetchAdminNotifications, 30000); // Check every 30 seconds
+    setInterval(fetchAllAppointments, 30000); // Check every 30 seconds
 });
+
+// These functions need to be global for onclick handlers
+window.viewAppointment = function(appointmentId) {
+    console.log("Viewing appointment:", appointmentId);
+    
+    const appointments = JSON.parse(localStorage.getItem('appointments')) || [];
+    const appointment = appointments.find(app => app.id === appointmentId);
+    
+    if (!appointment) {
+        alert("Appointment not found");
+        return;
+    }
+    
+    // Mark as read
+    appointment.read = true;
+    localStorage.setItem('appointments', JSON.stringify(appointments));
+    
+    // Update notification count
+    const notificationCount = document.getElementById('notification-count');
+    const unreadCount = appointments.filter(app => !app.read).length;
+    notificationCount.textContent = unreadCount;
+    notificationCount.style.display = unreadCount > 0 ? 'inline-block' : 'none';
+    
+    // Show appointment details in modal
+    const modal = document.getElementById('appointment-modal');
+    const modalContent = document.querySelector('.modal-content');
+    
+    modalContent.innerHTML = `
+        <span class="close-modal">&times;</span>
+        <h2>Appointment Details</h2>
+        <div class="appointment-details">
+            <p><strong>Date:</strong> ${formatDate(appointment.date)}</p>
+            <p><strong>Time:</strong> ${formatTime(appointment.time)}</p>
+            <p><strong>Student ID:</strong> ${appointment.studentId}</p>
+            <p><strong>Student Name:</strong> ${appointment.studentName}</p>
+            <p><strong>Type:</strong> ${appointment.type}</p>
+            <p><strong>Status:</strong> <span class="status-${appointment.status}">${appointment.status}</span></p>
+            <p><strong>Reason/Symptoms:</strong> ${appointment.reason || 'N/A'}</p>
+        </div>
+        ${appointment.status === 'pending' ? `
+        <div class="modal-actions">
+            <button onclick="approveAppointment(${appointmentId})" class="approve-btn">Approve</button>
+            <button onclick="rejectAppointment(${appointmentId})" class="reject-btn">Reject</button>
+        </div>` : ''}
+    `;
+    
+    modal.style.display = 'block';
+    
+    // Close modal when clicking on X
+    document.querySelector('.close-modal').addEventListener('click', function() {
+        modal.style.display = 'none';
+    });
+};
+
+window.approveAppointment = function(appointmentId) {
+    console.log("Approving appointment:", appointmentId);
+    
+    const appointments = JSON.parse(localStorage.getItem('appointments')) || [];
+    const appointmentIndex = appointments.findIndex(app => app.id === appointmentId);
+    
+    if (appointmentIndex === -1) {
+        alert("Appointment not found");
+        return;
+    }
+    
+    // Update status
+    appointments[appointmentIndex].status = 'approved';
+    appointments[appointmentIndex].read = true;
+    localStorage.setItem('appointments', JSON.stringify(appointments));
+    
+    // In a real app, this would call an API to update the database
+    
+    // Create a notification
+    const adminNotifications = JSON.parse(localStorage.getItem('adminNotifications')) || [];
+    adminNotifications.push({
+        id: Date.now(),
+        type: 'appointment_status',
+        message: `Appointment with ${appointments[appointmentIndex].studentName} on ${formatDate(appointments[appointmentIndex].date)} at ${formatTime(appointments[appointmentIndex].time)} has been approved.`,
+        timestamp: new Date().toISOString(),
+        read: true
+    });
+    localStorage.setItem('adminNotifications', JSON.stringify(adminNotifications));
+    
+    // Update UI
+    alert("Appointment approved successfully");
+    
+    // Close modal if open
+    const modal = document.getElementById('appointment-modal');
+    if (modal && modal.style.display === 'block') {
+        modal.style.display = 'none';
+    }
+    
+    // Refresh appointments list
+    const recentAppointments = document.getElementById('recent-appointments');
+    const allAppointments = document.getElementById('all-appointments');
+    
+    if (document.getElementById('section-dashboard').classList.contains('active')) {
+        loadRecentAppointments();
+    } else if (document.getElementById('section-appointments').classList.contains('active')) {
+        loadAllAppointments(document.getElementById('status-filter').value);
+    }
+};
+
+window.rejectAppointment = function(appointmentId) {
+    console.log("Rejecting appointment:", appointmentId);
+    
+    const appointments = JSON.parse(localStorage.getItem('appointments')) || [];
+    const appointmentIndex = appointments.findIndex(app => app.id === appointmentId);
+    
+    if (appointmentIndex === -1) {
+        alert("Appointment not found");
+        return;
+    }
+    
+    // Update status
+    appointments[appointmentIndex].status = 'rejected';
+    appointments[appointmentIndex].read = true;
+    localStorage.setItem('appointments', JSON.stringify(appointments));
+    
+    // In a real app, this would call an API to update the database
+    
+    // Create a notification
+    const adminNotifications = JSON.parse(localStorage.getItem('adminNotifications')) || [];
+    adminNotifications.push({
+        id: Date.now(),
+        type: 'appointment_status',
+        message: `Appointment with ${appointments[appointmentIndex].studentName} on ${formatDate(appointments[appointmentIndex].date)} at ${formatTime(appointments[appointmentIndex].time)} has been rejected.`,
+        timestamp: new Date().toISOString(),
+        read: true
+    });
+    localStorage.setItem('adminNotifications', JSON.stringify(adminNotifications));
+    
+    // Update UI
+    alert("Appointment rejected successfully");
+    
+    // Close modal if open
+    const modal = document.getElementById('appointment-modal');
+    if (modal && modal.style.display === 'block') {
+        modal.style.display = 'none';
+    }
+    
+    // Refresh appointments list
+    if (document.getElementById('section-dashboard').classList.contains('active')) {
+        loadRecentAppointments();
+    } else if (document.getElementById('section-appointments').classList.contains('active')) {
+        loadAllAppointments(document.getElementById('status-filter').value);
+    }
+};
+
+window.viewStudent = function(studentId) {
+    console.log("Viewing student:", studentId);
+    
+    const appointments = JSON.parse(localStorage.getItem('appointments')) || [];
+    const studentAppointments = appointments.filter(app => app.studentId === studentId);
+    
+    if (studentAppointments.length === 0) {
+        alert("No appointments found for this student");
+        return;
+    }
+    
+    const student = {
+        id: studentId,
+        name: studentAppointments[0].studentName || `Student ${studentId}`,
+        appointments: studentAppointments
+    };
+    
+    // Show student details in modal
+    const modal = document.getElementById('appointment-modal');
+    const modalContent = document.querySelector('.modal-content');
+    
+    modalContent.innerHTML = `
+        <span class="close-modal">&times;</span>
+        <h2>Student Details</h2>
+        <div class="student-details">
+            <p><strong>Student ID:</strong> ${student.id}</p>
+            <p><strong>Student Name:</strong> ${student.name}</p>
+            <p><strong>Total Appointments:</strong> ${student.appointments.length}</p>
+        </div>
+        <h3>Appointment History</h3>
+        <table class="appointments-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Time</th>
+                    <th>Type</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${student.appointments.map(app => `
+                    <tr>
+                        <td>${formatDate(app.date)}</td>
+                        <td>${formatTime(app.time)}</td>
+                        <td>${app.type}</td>
+                        <td class="status-${app.status}">${app.status}</td>
+                        <td>
+                            <button onclick="viewAppointment(${app.id})" class="view-btn">View</button>
+                        </td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    `;
+    
+    modal.style.display = 'block';
+    
+    // Close modal when clicking on X
+    document.querySelector('.close-modal').addEventListener('click', function() {
+        modal.style.display = 'none';
+    });
+};
+
+window.markAdminNotificationAsRead = function(notificationId) {
+    console.log("Marking notification as read:", notificationId);
+    
+    const adminNotifications = JSON.parse(localStorage.getItem('adminNotifications')) || [];
+    const notificationIndex = adminNotifications.findIndex(note => note.notification_id === notificationId);
+    
+    if (notificationIndex === -1) {
+        console.error("Notification not found:", notificationId);
+        return;
+    }
+    
+    // Update read status
+    adminNotifications[notificationIndex].read_status = true;
+    localStorage.setItem('adminNotifications', JSON.stringify(adminNotifications));
+    
+    // Update in database
+    fetch('/api/admin/notifications/mark-read', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            notification_ids: [notificationId]
+        })
+    })
+    .catch(error => {
+        console.error('Error marking notification as read:', error);
+    });
+    
+    // Update UI
+    const notificationElement = document.querySelector(`.notification-item[onclick*="${notificationId}"]`);
+    if (notificationElement) {
+        notificationElement.classList.remove('unread');
+        notificationElement.classList.add('read');
+    }
+    
+    // Update notification count
+    checkNotifications();
+};
+
+window.viewRelatedAppointment = function(appointmentId, event) {
+    // Prevent the parent notification click event
+    if (event) {
+        event.stopPropagation();
+    }
+    
+    viewAppointment(appointmentId);
+};
+
+// Helper functions
+function formatDate(dateStr) {
+    if (!dateStr) return 'N/A';
+    
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return dateStr;
+    
+    return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+    });
+}
+
+function formatTime(timeStr) {
+    if (!timeStr) return 'N/A';
+    
+    // Handle cases where timeStr is already in HH:MM format
+    if (timeStr.includes(':')) {
+        const [hours, minutes] = timeStr.split(':').map(Number);
+        const period = hours >= 12 ? 'PM' : 'AM';
+        const formattedHours = hours % 12 || 12;
+        return `${formattedHours}:${minutes.toString().padStart(2, '0')} ${period}`;
+    }
+    
+    // Handle cases where timeStr is a timestamp
+    const date = new Date(timeStr);
+    if (!isNaN(date.getTime())) {
+        return date.toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    }
+    
+    return timeStr;
+}
+
+function checkNotifications() {
+    const appointments = JSON.parse(localStorage.getItem('appointments')) || [];
+    const adminNotifications = JSON.parse(localStorage.getItem('adminNotifications')) || [];
+    
+    // Count unread items from both sources
+    const unreadAppointments = appointments.filter(app => !app.read).length;
+    const unreadNotifications = adminNotifications.filter(note => !note.read_status).length;
+    const totalUnread = unreadAppointments + unreadNotifications;
+    
+    const notificationCount = document.getElementById('notification-count');
+    if (notificationCount) {
+        notificationCount.textContent = totalUnread;
+        notificationCount.style.display = totalUnread > 0 ? 'inline-block' : 'none';
+    }
+}

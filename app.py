@@ -76,7 +76,7 @@ def create_appointment():
     response = supabase.table("appointments").insert(new_appointment).execute()
     
     if response.data:
-        # Create notification for new appointment
+        # Create notification for student
         notification = {
             "student_id": student_id,
             "message": f"You have booked a new {appointment_type} appointment on {appointment_date} at {appointment_time}.",
@@ -85,6 +85,17 @@ def create_appointment():
         }
         
         supabase.table("notifications").insert(notification).execute()
+        
+        # Create notification for admin dashboard
+        admin_notification = {
+            "student_id": 0,  # Using 0 to indicate this is for admin
+            "message": f"Student {student_id} has booked a new {appointment_type} appointment on {appointment_date} at {appointment_time}.",
+            "type": "new_appointment",
+            "related_appointment_id": response.data[0]["appointment_id"],
+            "read_status": False
+        }
+        
+        supabase.table("notifications").insert(admin_notification).execute()
         
         return jsonify({"success": True, "appointment": response.data[0]})
     
@@ -123,6 +134,20 @@ def get_notifications():
     
     return jsonify(response.data)
 
+@app.route("/api/admin/notifications", methods=["GET"])
+def get_admin_notifications():
+    # Get all notifications for the admin (student_id = 0)
+    response = supabase.table("notifications").select("*").eq("student_id", 0).execute()
+    
+    return jsonify(response.data)
+
+@app.route("/api/admin/appointments", methods=["GET"])
+def get_all_appointments():
+    # Get all appointments for admin view
+    response = supabase.table("appointments").select("*").execute()
+    
+    return jsonify(response.data)
+
 @app.route("/api/notifications/mark-read", methods=["POST"])
 def mark_notifications_read():
     student_id = session.get("student_id")
@@ -145,8 +170,6 @@ def clear_notifications():
     supabase.table("notifications").delete().eq("student_id", student_id).execute()
     
     return jsonify({"success": True})
-
-
 
 @app.route('/admindash')
 def admindash():
@@ -198,7 +221,6 @@ def book_appointment():
         return f"<h3>Error: {response.error.message}</h3>"
 
     return redirect(url_for('studentdash'))
-
 
 # --- Supabase Query Functions ---
 def insert_user(email, full_name, role):
